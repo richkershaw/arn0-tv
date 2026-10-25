@@ -20,6 +20,9 @@ const marks = {
     movistar: SI + 'movistar.svg',
     playstation: SI + 'playstation.svg',
     nintendoswitch: SI + 'nintendoswitch.svg',
+    channel4: SI + 'channel4.svg',
+    itvx: SI + 'itvx.svg',
+    now: SI + 'now.svg',
     disneyplus: CBI + 'disney-plus.svg',
     xbox: CBI + 'xbox.svg'
 };
