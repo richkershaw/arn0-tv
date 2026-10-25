@@ -89,10 +89,9 @@ window.LAUNCHER_CONFIG = {
      * label in HA is shown and `buttons` is ignored, so the list is edited in HA itself.
      */
     homeAssistant: {
-        url: null,
-        token: null,
-        label: null,
-        buttons: []         // [{ entity: 'scene.tv_mode', label: 'TV Mode' }]
+        url: null,          // 'http://<ha-host>:8123'
+        token: null,        // a long-lived access token (HA profile -> Security)
+        sidebar: null       // the Lovelace dashboard url_path the left column reads, e.g. 'tv-sidebar'
     },
 
     /*

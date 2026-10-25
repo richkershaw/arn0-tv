@@ -104,6 +104,7 @@ files:
   - js/devlog.js
   - js/ha.js
   - js/mqtt.js
+  - js/sidebar.js
   - js/home.js
   - js/inputs.js
   - js/platform-probe.js

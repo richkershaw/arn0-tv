@@ -48,6 +48,18 @@
         return rows;
     }
 
+    // Group a wrapped flex row's children into visual lines by their top offset.
+    function rowsByLine(items) {
+        var lines = [], cur = [], top = null;
+        items.forEach(function (it) {
+            var t = it.offsetTop;
+            if (top === null || Math.abs(t - top) > 6) { if (cur.length) lines.push(cur); cur = []; top = t; }
+            cur.push(it);
+        });
+        if (cur.length) lines.push(cur);
+        return lines;
+    }
+
     function register(name, def) {
         views[name] = def;
         focus[name] = { r: def.startRow || 0, c: 0, last: {} };
@@ -132,6 +144,13 @@
     }
 
     // Point generic focus at an element (e.g. after re-rendering).
+    function atRowStart() {
+        var def = views[current];
+        if (!def || !def.rows) return true;
+        var f = focus[current];
+        return !f || f.c === 0;
+    }
+
     function focusOn(target) {
         var r = rows();
         for (var i = 0; i < r.length; i++) {
@@ -187,6 +206,7 @@
         var horizontal = track.classList.contains('row-track');
         var vertical = track.classList.contains('grid') || track.classList.contains('vtrack');
         if (!horizontal && !vertical) return;
+        if (horizontal && getComputedStyle(track).flexWrap === 'wrap') return;  // wrapped grid: fits
         var port = track.parentNode;
         var size = horizontal ? port.clientWidth
             : port.clientHeight - (parseInt(getComputedStyle(port).paddingTop, 10) || 0);
@@ -280,12 +300,14 @@
         children: children,
         clamp: clamp,
         chunk: chunk,
+        rowsByLine: rowsByLine,
         register: register,
         show: show,
         back: back,
         refresh: refresh,
         setFocus: setFocus,
         focusOn: focusOn,
+        atRowStart: atRowStart,
         resetScroll: resetScroll,
         // For state changes that redraw hints without switching view.
         refreshHints: function () { renderHints(views[current]); },

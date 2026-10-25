@@ -16,7 +16,7 @@ window.LAUNCHER_LOCAL = {
     // locale: 'fr-FR',
 
     // Scene buttons on Home. Token: HA → your profile → Security → Long-lived access tokens.
-    // homeAssistant: { url: 'http://192.168.1.10:8123', token: 'eyJ…', label: 'tv_launcher' },
+    // homeAssistant: { url: 'http://192.168.1.10:8123', token: 'eyJ…', sidebar: 'tv-sidebar' },
 
     // Report what is on the TV to Home Assistant over MQTT (Mosquitto WebSocket port is 1884).
     // mqtt: { url: 'ws://192.168.1.10:1884', username: 'tv', password: '…' },

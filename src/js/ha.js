@@ -1,190 +1,128 @@
 /*
- * Home Assistant: scene buttons on Home.
+ * Home Assistant client: one authenticated WebSocket for the dashboard config and live state,
+ * plus REST for actions and camera frames. Used by js/sidebar.js.
  *
- * Talks to Home Assistant's REST API with a long-lived access token (Profile → Security →
- * Long-lived access tokens). Put the URL and token in js/config.local.js, which is gitignored:
+ * Config (js/config.local.js):
+ *   homeAssistant: { url: 'http://192.168.1.10:8123', token: 'eyJ…', sidebar: 'tv-sidebar' }
  *
- *   window.LAUNCHER_LOCAL = {
- *       homeAssistant: {
- *           url: 'http://192.168.1.10:8123',
- *           token: 'eyJ…',
- *           label: 'tv_launcher'      // optional: show everything with this HA label
- *       }
- *   };
- *
- * Which buttons appear, in order of preference:
- *   1. `label` set: every scene/script/button entity carrying that label in Home Assistant, so the
- *      list is edited in HA (Settings → Labels) rather than by rebuilding the app.
- *   2. otherwise `buttons` from config.js: [{ entity: 'scene.tv_mode', label: 'TV Mode' }].
- * The last list fetched is cached, so the row draws instantly and survives HA being down.
- *
- * Pressing one calls the domain's own action: scene/script → turn_on, button/input_button →
- * press, automation → trigger.
+ * The sidebar is read from the Lovelace dashboard named by `sidebar` (its url_path), so what the
+ * TV shows is managed entirely in Home Assistant's dashboard editor.
  */
 (function () {
     'use strict';
 
-    var CACHE_KEY = 'arn0.ha.buttons.v1';
-    var TIMEOUT_MS = 6000;
     var log = DevLog.log;
-
     var cfg = (window.LAUNCHER_CONFIG || {}).homeAssistant || {};
-    var listeners = [];
-    var buttons = readCache() || staticButtons();
 
-    var ACTIONS = {
-        scene: 'turn_on',
-        script: 'turn_on',
-        button: 'press',
-        input_button: 'press',
-        automation: 'trigger'
-    };
+    function configured() { return !!(cfg.url && cfg.token); }
+    function base() { return (cfg.url || '').replace(/\/+$/, ''); }
+    function wsUrl() { return base().replace(/^http/, 'ws') + '/api/websocket'; }
 
-    function configured() {
-        return !!(cfg.url && cfg.token);
-    }
-
-    // Preview with nothing configured: show a few pretend buttons so the layout can be judged.
-    function demo() {
-        return !!window.__TIZEN_MOCK__ && !configured();
-    }
-
-    function staticButtons() {
-        if (demo()) {
-            return [
-                { entity: 'scene.tv_mode', label: 'TV Mode' },
-                { entity: 'scene.living_room_on', label: 'Lights on' },
-                { entity: 'scene.living_room_off', label: 'Lights off' }
-            ];
-        }
-        return (cfg.buttons || []).filter(function (b) { return b && b.entity; });
-    }
-
-    function readCache() {
-        try {
-            var list = JSON.parse(localStorage.getItem(CACHE_KEY));
-            return Array.isArray(list) ? list : null;
-        } catch (e) {
-            return null;
-        }
-    }
-
-    function writeCache(list) {
-        try {
-            localStorage.setItem(CACHE_KEY, JSON.stringify(list));
-        } catch (e) {
-            // Only costs the instant first draw.
-        }
-    }
-
+    // ---- REST ----
     function request(method, path, body) {
         return new Promise(function (resolve, reject) {
-            var xhr = new XMLHttpRequest();
-            xhr.open(method, cfg.url.replace(/\/+$/, '') + path);
-            xhr.timeout = TIMEOUT_MS;
-            xhr.setRequestHeader('Authorization', 'Bearer ' + cfg.token);
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.onload = function () {
-                if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.responseText);
-                else if (xhr.status === 401) reject(new Error('token rejected (401)'));
-                else if (xhr.status === 500) {
-                    // HA ran the action but something in it failed, typically one offline device
-                    // in a scene. The rest has already been applied.
-                    var e = new Error('ran, but Home Assistant reported an error (see its logs)');
-                    e.partial = true;
-                    reject(e);
-                }
-                else reject(new Error('HTTP ' + xhr.status));
+            var x = new XMLHttpRequest();
+            x.open(method, base() + path);
+            x.timeout = 8000;
+            x.setRequestHeader('Authorization', 'Bearer ' + cfg.token);
+            x.setRequestHeader('Content-Type', 'application/json');
+            x.onload = function () {
+                if (x.status >= 200 && x.status < 300) resolve(x.responseText);
+                else if (x.status === 401) reject(new Error('token rejected (401)'));
+                else reject(new Error('HTTP ' + x.status));
             };
-            xhr.onerror = function () { reject(new Error('cannot reach ' + cfg.url)); };
-            xhr.ontimeout = function () { reject(new Error('timed out')); };
-            xhr.send(body ? JSON.stringify(body) : null);
+            x.onerror = function () { reject(new Error('cannot reach ' + base())); };
+            x.ontimeout = function () { reject(new Error('timed out')); };
+            x.send(body ? JSON.stringify(body) : null);
         });
     }
 
-    // Entities with the label, with their friendly names, in one round trip via the template API.
-    function fetchLabelled() {
-        var tpl = "{% set ns = namespace(out=[]) %}" +
-            "{% for e in label_entities('" + String(cfg.label).replace(/'/g, '') + "') | sort %}" +
-            "{% if e.split('.')[0] in ['scene','script','button','input_button','automation'] %}" +
-            "{% set ns.out = ns.out + [{'entity': e, 'label': state_attr(e, 'friendly_name') or e}] %}" +
-            "{% endif %}{% endfor %}{{ ns.out | tojson }}";
-        return request('POST', '/api/template', { template: tpl }).then(function (text) {
-            var list = JSON.parse(text);
-            if (!Array.isArray(list)) throw new Error('unexpected template result');
-            return list;
-        });
+    function callService(domain, service, entityId, data) {
+        var payload = {};
+        if (data) { for (var k in data) if (data.hasOwnProperty(k)) payload[k] = data[k]; }
+        if (entityId) payload.entity_id = entityId;
+        return request('POST', '/api/services/' + domain + '/' + service, payload);
     }
 
-    function sameList(a, b) {
-        return JSON.stringify(a) === JSON.stringify(b);
+    // A camera's current frame URL (token rotates inside the state, so this follows updates).
+    function entityPicture(state) {
+        if (!state || !state.attributes || !state.attributes.entity_picture) return null;
+        return base() + state.attributes.entity_picture;
     }
 
-    function setButtons(list) {
-        if (sameList(list, buttons)) return;
-        buttons = list;
-        writeCache(list);
-        listeners.forEach(function (fn) { fn(); });
+    // ---- WebSocket ----
+    var ws = null, msgId = 1, connected = false, reconnectT = null;
+    var handlers = {}, subId = null, cfgId = null;
+
+    function nextId() { return msgId++; }
+    function sendWS(o) { try { ws.send(JSON.stringify(o)); } catch (e) {} }
+
+    function afterAuth() {
+        connected = true;
+        log('HA connected');
+        if (handlers.onStatus) handlers.onStatus(true);
+        // Dashboard config (WebSocket-only).
+        cfgId = nextId();
+        sendWS({ id: cfgId, type: 'lovelace/config', url_path: cfg.sidebar || null });
+        // Initial states over REST, then subscribe to deltas.
+        request('GET', '/api/states').then(function (text) {
+            var arr = JSON.parse(text), map = {};
+            arr.forEach(function (s) { map[s.entity_id] = s; });
+            if (handlers.onStates) handlers.onStates(map);
+        }).catch(function (e) { log('HA get_states: ' + DevLog.errorText(e)); });
+        subId = nextId();
+        sendWS({ id: subId, type: 'subscribe_events', event_type: 'state_changed' });
     }
 
-    function refresh() {
-        if (!configured()) {
-            setButtons(staticButtons());
-            return Promise.resolve(buttons);
+    function onMessage(raw) {
+        var m;
+        try { m = JSON.parse(raw); } catch (e) { return; }
+        if (m.type === 'auth_required') { sendWS({ type: 'auth', access_token: cfg.token }); return; }
+        if (m.type === 'auth_invalid') { log('HA auth rejected'); try { ws.close(); } catch (e) {} return; }
+        if (m.type === 'auth_ok') { afterAuth(); return; }
+        if (m.type === 'result' && m.id === cfgId) {
+            if (m.success && m.result && handlers.onConfig) handlers.onConfig(m.result);
+            else if (!m.success) log('HA dashboard "' + (cfg.sidebar || '') + '" not readable');
+            return;
         }
-        if (!cfg.label) {
-            setButtons(staticButtons());
-            return Promise.resolve(buttons);
+        if (m.type === 'event' && m.id === subId && m.event && m.event.data) {
+            if (handlers.onChange) handlers.onChange(m.event.data.entity_id, m.event.data.new_state);
         }
-        return fetchLabelled().then(function (list) {
-            setButtons(list);
-            return list;
-        }, function (err) {
-            log('Home Assistant buttons: ' + DevLog.errorText(err));
-            throw err;
-        });
     }
 
-    function activate(button) {
-        var domain = button.entity.split('.')[0];
-        var action = ACTIONS[domain];
-        if (!action) return Promise.reject(new Error('unsupported entity ' + button.entity));
-        if (demo()) {
-            log('[preview] ' + domain + '.' + action + ' ' + button.entity);
-            return Promise.resolve();
-        }
-        if (!configured()) return Promise.reject(new Error('Home Assistant is not configured'));
-        return request('POST', '/api/services/' + domain + '/' + action, { entity_id: button.entity });
+    function scheduleReconnect() {
+        if (reconnectT) return;
+        reconnectT = setTimeout(function () { reconnectT = null; connect(handlers); }, 5000);
+    }
+
+    function connect(h) {
+        if (!configured() || ws) return;
+        handlers = h || handlers || {};
+        try { ws = new WebSocket(wsUrl()); }
+        catch (e) { log('HA WS: ' + DevLog.errorText(e)); scheduleReconnect(); return; }
+        ws.onmessage = function (e) { onMessage(e.data); };
+        ws.onclose = function () {
+            connected = false; ws = null;
+            if (handlers.onStatus) handlers.onStatus(false);
+            scheduleReconnect();
+        };
+        ws.onerror = function () { /* onclose handles reconnect */ };
     }
 
     function test() {
-        if (!configured()) {
-            log('Home Assistant: no url/token in config.local.js');
-            return Promise.reject(new Error('not configured'));
-        }
-        return request('GET', '/api/').then(function (text) {
-            log('Home Assistant: ' + text);
-            return refresh().then(function (list) {
-                log('Home Assistant buttons: ' + list.map(function (b) { return b.entity; }).join(', '));
-            });
-        });
+        if (!configured()) return Promise.reject(new Error('no url/token in config.local.js'));
+        return request('GET', '/api/').then(function (t) { log('HA REST: ' + t); return t; });
     }
 
     window.HA = {
         configured: configured,
-        buttons: function () { return buttons; },
-        refresh: refresh,
-        activate: activate,
-        onChange: function (fn) { listeners.push(fn); },
-        actions: function () {
-            return [{
-                label: 'Home Assistant: test connection and reload buttons',
-                run: function () {
-                    test().then(function () { UI.toast('Home Assistant OK'); }, function (err) {
-                        UI.toast('Home Assistant: ' + DevLog.errorText(err));
-                    });
-                }
-            }];
-        }
+        base: base,
+        request: request,
+        callService: callService,
+        entityPicture: entityPicture,
+        connect: connect,
+        isConnected: function () { return connected; },
+        test: test,
+        dashboardPath: function () { return cfg.sidebar || null; }
     };
 })();

@@ -134,35 +134,6 @@
         return miniTile({ label: input.label, brand: brand && { key: brand.key, bg: brand.bg, fg: brand.fg, mark: brand.mark } });
     }
 
-    // Home Assistant scene button: a pill in the top row, left of the gear.
-    function sceneTile(button) {
-        var pill = el('div', 'scene', button.label || button.entity);
-        pill._item = { kind: 'scene', entity: button.entity, label: button.label || button.entity };
-        return pill;
-    }
-
-    function renderScenes() {
-        var row = $('scenes-row');
-        row.innerHTML = '';
-        if (window.HA) HA.buttons().forEach(function (b) { row.appendChild(sceneTile(b)); });
-        if (UI.isVisible('home')) {
-            UI.refreshHints();
-            UI.refresh();
-        }
-    }
-
-    function runScene(item, pill) {
-        pill.classList.add('busy');
-        HA.activate(item).then(function () {
-            UI.toast(item.label);
-        }, function (err) {
-            UI.toast(err && err.partial ? item.label + ' ' + err.message
-                : 'Could not run ' + item.label + ': ' + DevLog.errorText(err));
-        }).then(function () {
-            pill.classList.remove('busy');
-        });
-    }
-
     // ---------- Home content
 
     // Consoles: edited list from Settings, else config.js.
@@ -209,8 +180,21 @@
             if (!input.hidden) row2.appendChild(inputTile(input));
         });
         $('inputs-section').classList.toggle('hidden', !row2.children.length);
+        positionConsoles();
         applyInputStatus();
         if (UI.isVisible('home')) UI.refresh();
+    }
+
+    // Consoles sit just below the wrapped apps block, whatever height it is.
+    function positionConsoles() {
+        var appsSec = $('apps-section');
+        $('inputs-section').style.top = (appsSec.offsetTop + appsSec.offsetHeight + 30) + 'px';
+    }
+
+    // Lets the sidebar line the apps row up with its first card; null restores the CSS default.
+    function setAppsTop(px) {
+        $('apps-section').style.top = (px == null ? '' : px + 'px');
+        positionConsoles();
     }
 
     function applyInputStatus() {
@@ -248,7 +232,6 @@
         if (window.Weather) actions = actions.concat(Weather.actions());
         if (window.RenderProbe) actions = actions.concat(RenderProbe.actions());
         if (window.PlatformProbe) actions = actions.concat(PlatformProbe.actions());
-        if (window.HA) actions = actions.concat(HA.actions());
         if (window.MQTT && MQTT.configured()) actions.push({
             label: 'MQTT: test connection to Home Assistant',
             run: function () {
@@ -446,20 +429,76 @@
         }
     }
 
+    // ---------- Left HA column: a focus region reached with Left from the main grid.
+    var sbState = { active: false, i: 0 };
+    function sbEls() { return window.Sidebar ? Sidebar.rows() : []; }
+    function sbHighlight() {
+        var els = sbEls();
+        els.forEach(function (e) { e.classList.remove('focused'); });
+        sbState.i = Math.max(0, Math.min(sbState.i, els.length - 1));
+        if (els[sbState.i]) {
+            els[sbState.i].classList.add('focused');
+            if (window.Sidebar && Sidebar.ensureVisible) Sidebar.ensureVisible(els[sbState.i]);
+        }
+    }
+    function enterSidebar() {
+        if (!sbEls().length) return false;
+        sbState.active = true;
+        UI.setFocus(null);
+        sbHighlight();
+        UI.refreshHints();
+        return true;
+    }
+    function exitSidebar() {
+        sbState.active = false;
+        if (sbState.camOpen && window.Sidebar) { Sidebar.closeCamera(); sbState.camOpen = false; }
+        sbEls().forEach(function (e) { e.classList.remove('focused'); });
+        UI.refresh();
+        UI.refreshHints();
+    }
+    function sbKey(k) {
+        var KEY = UI.KEY, els = sbEls(), box = els[sbState.i];
+        if (sbState.camOpen) {
+            if (k === KEY.BACK || k === KEY.ESC || k === KEY.BACKSPACE || k === KEY.ENTER || k === KEY.LEFT) {
+                Sidebar.closeCamera(); sbState.camOpen = false; UI.refreshHints();
+            }
+            return true;
+        }
+        if (k === KEY.UP) { if (sbState.i > 0) { sbState.i--; sbHighlight(); } return true; }
+        if (k === KEY.DOWN) { if (sbState.i < els.length - 1) { sbState.i++; sbHighlight(); } return true; }
+        if (k === KEY.LEFT) { if (box && Sidebar.isStepper(box)) Sidebar.adjust(box, -1); return true; }
+        if (k === KEY.RIGHT) { if (box && Sidebar.isStepper(box)) Sidebar.adjust(box, 1); else exitSidebar(); return true; }
+        if (k === KEY.ENTER) {
+            if (box && Sidebar.isCamera(box)) { Sidebar.openCamera(box._card.entity); sbState.camOpen = true; UI.refreshHints(); }
+            else if (box) Sidebar.activate(box);
+            return true;
+        }
+        if (k === KEY.BACK || k === KEY.ESC || k === KEY.BACKSPACE) { exitSidebar(); return true; }
+        return true;   // hold focus in the column
+    }
+
     function registerViews() {
         UI.register('home', {
             el: $('home'),
             startRow: 1,
             hints: function () {
-                return [['OK', 'Open'], ['▲', $('scenes-row').children.length ? 'Scenes · Settings' : 'Settings']];
+                if (sbState.camOpen) return [['Back', 'Close']];
+                return sbState.active
+                    ? [['OK', 'Toggle'], ['◀ ▶', 'Adjust'], ['Back', 'Apps']]
+                    : [['OK', 'Open'], ['▲', 'Settings']];
+            },
+            onKey: function (k) {
+                if (sbState.active) return sbKey(k);
+                if (k === UI.KEY.LEFT && UI.atRowStart() && sbEls().length) return enterSidebar();
+                return false;
             },
             rows: function () {
-                return [UI.children($('scenes-row')).concat([$('gear')]),
-                    UI.children($('apps-row')), UI.children($('inputs-row'))];
+                return [[$('gear')]]
+                    .concat(UI.rowsByLine(UI.children($('apps-row'))))
+                    .concat([UI.children($('inputs-row'))]);
             },
-            activate: function (item, target) {
-                if (item.kind === 'scene') runScene(item, target);
-                else if (item.kind === 'app') launchApp(item);
+            activate: function (item) {
+                if (item.kind === 'app') launchApp(item);
                 else if (item.kind === 'all') UI.show('all');
                 else if (item.kind === 'input') openInput(item);
                 else if (item.kind === 'settings') UI.show('settings');
@@ -508,11 +547,6 @@
         var cached = readCache();
         if (cached && cached.length) setApps(cached);
         else renderHome();
-        if (window.HA) {
-            HA.onChange(renderScenes);
-            renderScenes();
-            setTimeout(function () { HA.refresh().catch(function () {}); }, 2500);
-        }
         UI.show('home');
         Wallpaper.start();
         if (window.MQTT) { MQTT.start(); MQTT.reportHome(); }
@@ -526,7 +560,6 @@
             refreshInputStatus();
             // Back on the launcher's own screen (an app was closed, or we returned from a viewer).
             if (window.MQTT && !state.tvMode) MQTT.reportHome();
-            if (window.HA) HA.refresh().catch(function () {});
             if (UI.isVisible('home')) Wallpaper.homeShown();
             if (Date.now() - state.lastFetch > REFRESH_AFTER_MS) setTimeout(loadApps, 1500);
         });
@@ -550,6 +583,9 @@
         renderLab: renderLab,
         updateClock: updateClock,
         reloadApps: loadApps,
+        setAppsTop: setAppsTop,
+        reSidebarFocus: function () { if (sbState.active) sbHighlight(); },
+        sidebarGone: function () { if (sbState.active) exitSidebar(); },
         miniTile: miniTile,
         miniInputTile: miniInputTile,
         onAppsChanged: function (fn) { listeners.push(fn); }
