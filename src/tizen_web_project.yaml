@@ -1,0 +1,149 @@
+# Project type [web_app, test_runner]
+project_type: web_app
+
+# Default profile, Tizen API version
+profile: tv-samsung
+api_version: "3.0"
+
+# Build type [Debug/ Release/ Test]
+build_type: Debug
+
+# Output name for application
+output_name: Launcher
+
+# Output path for build
+output_path: ""
+
+# Enable size optimization of wgt for web workspace
+opt: false
+
+# Signing profile to be used for Tizen package signing
+# If value is empty: "", active signing profile will be used
+# Else If value is ".", default signing profile will be used
+signing_profile: ""
+
+# list of certs in web project (.trust-anchor)
+trust_anchor: []
+
+# list of files in web project (.html,.css etc) and resources
+files:
+  - css/style.css
+  - fonts/OFL.txt
+  - fonts/dm-sans.woff2
+  - fonts/inter.woff2
+  - fonts/manrope.woff2
+  - fonts/outfit.woff2
+  - icon.png
+  - img/bg.jpg
+  - img/marks/SOURCES.md
+  - img/marks/appletv.svg
+  - img/marks/crunchyroll.svg
+  - img/marks/now.svg
+  - img/marks/itvx.svg
+  - img/marks/channel4.svg
+  - img/marks/dazn.svg
+  - img/marks/disneyplus.svg
+  - img/marks/max.svg
+  - img/marks/movistar.svg
+  - img/marks/netflix.svg
+  - img/marks/nintendoswitch.svg
+  - img/marks/playstation.svg
+  - img/marks/plex.svg
+  - img/marks/primevideo.svg
+  - img/marks/spotify.svg
+  - img/marks/twitch.svg
+  - img/marks/xbox.svg
+  - img/marks/youtube.svg
+  - img/tiles/appletv.svg
+  - img/tiles/crunchyroll.svg
+  - img/tiles/now.svg
+  - img/tiles/iplayer.jpg
+  - img/tiles/itvx.svg
+  - img/tiles/channel4.svg
+  - img/tiles/dazn.svg
+  - img/tiles/disneyplus.svg
+  - img/tiles/max.svg
+  - img/tiles/movistar.svg
+  - img/tiles/netflix.svg
+  - img/tiles/playstation.svg
+  - img/tiles/plex.svg
+  - img/tiles/primevideo.svg
+  - img/tiles/spotify.svg
+  - img/tiles/switch.svg
+  - img/tiles/twitch.svg
+  - img/tiles/xbox.svg
+  - img/tiles/youtube.svg
+  - img/wallpapers/aurora.jpg
+  - img/wallpapers/coast.jpg
+  - img/wallpapers/earth.jpg
+  - img/wallpapers/forest.jpg
+  - img/wallpapers/hills.jpg
+  - img/wallpapers/kyoto.jpg
+  - img/wallpapers/milky-way.jpg
+  - img/wallpapers/night-sky.jpg
+  - img/wallpapers/thumbs/aurora.jpg
+  - img/wallpapers/thumbs/coast.jpg
+  - img/wallpapers/thumbs/earth.jpg
+  - img/wallpapers/thumbs/forest.jpg
+  - img/wallpapers/thumbs/hills.jpg
+  - img/wallpapers/thumbs/kyoto.jpg
+  - img/wallpapers/thumbs/milky-way.jpg
+  - img/wallpapers/thumbs/night-sky.jpg
+  - img/wallpapers/thumbs/valley-snow.jpg
+  - img/wallpapers/thumbs/waterfall.jpg
+  - img/wallpapers/valley-snow.jpg
+  - img/wallpapers/waterfall.jpg
+  - index.html
+  - js/appearance.js
+  - js/apps.js
+  - js/boot.js
+  - js/brands.js
+  - js/config.js
+  - js/config.local.example.js
+  - js/config.local.js
+  - js/devlog.js
+  - js/ha.js
+  - js/mqtt.js
+  - js/home.js
+  - js/inputs.js
+  - js/platform-probe.js
+  - js/prefs.js
+  - js/render-probe.js
+  - js/runner-game.js
+  - js/screensaver.js
+  - js/settings.js
+  - js/sound.js
+  - js/tizen-mock.js
+  - js/ui.js
+  - js/wallpaper.js
+  - js/wallpapers.js
+  - js/weather.js
+
+# list of files to exclude based on the matched patterns
+excludes:
+  - Build/*
+  - Debug/*
+  - Directory.Build.targets
+  - Release/*
+  - Test/*
+  - \.Build/.*
+  - \.buildResult/.*
+  - \.csproj
+  - \.externalToolBuilders/.*
+  - \.gn
+  - \.obj/.*
+  - \.package/.*
+  - \.project
+  - \.rds_delta
+  - \.sdk_delta.info
+  - \.settings/.*
+  - \.sign/.*
+  - \.tizen-ui-builder-tool.xml
+  - \.tproject
+  - \.wgt
+  - tizen_web_project.yaml
+  - webUnitTest/*
+
+# project dependencies
+deps: []
+

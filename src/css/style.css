@@ -327,6 +327,42 @@ h1, h2 {
 .dot.on { background: #4ade80; }
 
 
+/* Home Assistant scene buttons: pills in the top row, ending just left of the gear. */
+
+.scenes {
+    position: absolute;
+    top: 100px;
+    right: calc(var(--edge) + 76px + 24px);
+    display: flex;
+}
+
+.scene {
+    flex: none;
+    height: 76px;
+    line-height: 76px;
+    margin-left: 18px;
+    padding: 0 34px;
+    border-radius: 38px;
+    background: rgba(255, 255, 255, 0.1);
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--muted);
+    white-space: nowrap;
+    max-width: 360px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    will-change: transform;
+    transition: transform 0.1s ease-out;
+}
+
+.scene.focused {
+    background: var(--fg);
+    color: var(--bg);
+    transform: scale(1.06);
+}
+
+.scene.busy { opacity: 0.55; }
+
 /* Gear (Settings) */
 
 .gear {
@@ -702,11 +738,17 @@ h1, h2 {
 
 /* ---------- Lab ---------- */
 
-.lab-list {
+/* The list scrolls inside this port (UI.ensureVisible moves the .vtrack). */
+.lab-port {
     position: absolute;
     top: 220px;
+    bottom: 120px;
     left: var(--edge);
     width: 860px;
+    overflow: hidden;
+}
+
+.lab-list {
     margin: 0;
     padding: 0;
     list-style: none;

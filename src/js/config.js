@@ -13,20 +13,22 @@
  */
 window.LAUNCHER_CONFIG = {
     apps: [
-        { id: 'xvvl3S1TT1.TizenTubeStandalone', label: 'YouTube', brand: 'youtube' },
-        { id: 'rJeHak5zRg.Spotify', label: 'Spotify' },
-        { id: 'Jz7aUrV2Q4.Twitch', label: 'Twitch' },
-        { id: 'E0P3lRI4H7.MYTF1', label: 'TF1+' },
-        { id: 'org.tizen.netflix-app', label: 'Netflix' },
-        { id: 'org.tizen.primevideo', label: 'Prime Video' },
-        { id: 'MCmYXNxgcu.DisneyPlus', label: 'Disney+' },
-        { id: 'com.samsung.tv.aria-video', label: 'Apple TV' }
+        // Exact ids from this TV (Lab → "Send installed app list to log"; also shown bottom-left
+        // in All apps). Pinned rather than matched by name because the TV also carries
+        // "dummy" copies of Prime Video and Apple TV that a name match could pick.
+        { id: '9Ur5IzDKqV.TizenYouTube', label: 'YouTube', brand: 'youtube' },
+        { id: 'DqEoaplKlw.bbchybrid', label: 'BBC iPlayer', brand: 'iplayer' },
+        { id: 'OCaxbgg9v6.chfourctv', label: 'Channel 4', brand: 'channel4' },
+        { id: 'org.tizen.primevideo', label: 'Prime Video', brand: 'primevideo' },
+        { id: 'MCmYXNxgcu.DisneyPlus', label: 'Disney+', brand: 'disneyplus' },
+        { id: 'com.samsung.tv.aria-video', label: 'Apple TV', brand: 'appletv' },
+        { id: '1Qb6IoAcGC.NowTV', label: 'NOW', brand: 'now' },
+        { id: 'kIciSQlYEM.plex', label: 'Plex', brand: 'plex' }
     ],
 
     inputs: [
-        { hdmi: 1, label: 'Nintendo Switch 2', brand: 'switch' },
-        { hdmi: 2, label: 'PlayStation 5', brand: 'playstation' },
-        { hdmi: 4, label: 'Xbox Series X', brand: 'xbox' }
+        { hdmi: 1, label: 'Nintendo Switch', brand: 'switch' },
+        { hdmi: 3, label: 'PlayStation 5', brand: 'playstation' }
     ],
 
     // How an input tile switches the TV. See README "HDMI inputs".
@@ -79,6 +81,31 @@ window.LAUNCHER_CONFIG = {
         move: { freq: 880, ms: 38, type: 'triangle' },
         edge: { freq: 200, ms: 70, type: 'sine' },
         select: { freq: 1320, ms: 55, type: 'triangle' }
+    },
+
+    /*
+     * Home Assistant scene buttons along the top of Home (js/ha.js). The url and token belong in
+     * js/config.local.js, never here. With `label` set, every scene/script/button carrying that
+     * label in HA is shown and `buttons` is ignored, so the list is edited in HA itself.
+     */
+    homeAssistant: {
+        url: null,
+        token: null,
+        label: null,
+        buttons: []         // [{ entity: 'scene.tv_mode', label: 'TV Mode' }]
+    },
+
+    /*
+     * Report what is on the TV to Home Assistant over MQTT (js/mqtt.js). The launcher knows which
+     * app it launched, which is the one reliable signal on this TV. url/username/password belong
+     * in js/config.local.js. With discovery on, sensor.framey_launcher appears automatically.
+     */
+    mqtt: {
+        url: null,              // 'ws://<ha-host>:1884'  (Mosquitto's WebSocket port)
+        username: null,
+        password: null,
+        topic: 'framey/launcher',
+        discovery: true
     },
 
     // Development only: where the Lab screen sends its logs (npm run devlog on your computer).

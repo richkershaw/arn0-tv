@@ -15,6 +15,8 @@
                 <div id="time"><span id="time-main"></span><span id="time-suffix"></span></div>
                 <div id="date"></div>
             </header>
+            <!-- Home Assistant scene buttons, left of the gear (js/ha.js). Empty unless configured. -->
+            <div id="scenes-row" class="scenes"></div>
             <div id="gear" class="gear">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="3.2"/>
@@ -101,7 +103,7 @@
                 <h1>Lab</h1>
                 <div>Tests for the TV. Results go to the log (and to the Mac if devLogUrl is set).</div>
             </header>
-            <ul id="lab-list" class="lab-list"></ul>
+            <div class="lab-port"><ul id="lab-list" class="lab-list vtrack"></ul></div>
             <pre id="lab-log" class="lab-log"></pre>
         </section>
 
@@ -173,6 +175,8 @@
     <script src="js/appearance.js"></script>
     <script src="js/weather.js"></script>
     <script src="js/sound.js"></script>
+    <script src="js/ha.js"></script>
+    <script src="js/mqtt.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/render-probe.js"></script>
     <script src="js/platform-probe.js"></script>

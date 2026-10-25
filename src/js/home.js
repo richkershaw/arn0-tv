@@ -63,7 +63,9 @@
         var tile = el('div', 'tile');
         if (item.brand) {
             tile.style.background = item.brand.bg;
-            if (item.brand.text) {
+            if (item.brand.image) {
+                tile.style.background = 'url(' + item.brand.image + ') center / cover no-repeat ' + item.brand.bg;
+            } else if (item.brand.text) {
                 var word = el('div', 'wordmark', item.brand.text);
                 word.style.color = item.brand.fg;
                 tile.appendChild(word);
@@ -130,6 +132,35 @@
     function miniInputTile(input) {
         var brand = findBrand(input.brand || '');
         return miniTile({ label: input.label, brand: brand && { key: brand.key, bg: brand.bg, fg: brand.fg, mark: brand.mark } });
+    }
+
+    // Home Assistant scene button: a pill in the top row, left of the gear.
+    function sceneTile(button) {
+        var pill = el('div', 'scene', button.label || button.entity);
+        pill._item = { kind: 'scene', entity: button.entity, label: button.label || button.entity };
+        return pill;
+    }
+
+    function renderScenes() {
+        var row = $('scenes-row');
+        row.innerHTML = '';
+        if (window.HA) HA.buttons().forEach(function (b) { row.appendChild(sceneTile(b)); });
+        if (UI.isVisible('home')) {
+            UI.refreshHints();
+            UI.refresh();
+        }
+    }
+
+    function runScene(item, pill) {
+        pill.classList.add('busy');
+        HA.activate(item).then(function () {
+            UI.toast(item.label);
+        }, function (err) {
+            UI.toast(err && err.partial ? item.label + ' ' + err.message
+                : 'Could not run ' + item.label + ': ' + DevLog.errorText(err));
+        }).then(function () {
+            pill.classList.remove('busy');
+        });
     }
 
     // ---------- Home content
@@ -217,6 +248,15 @@
         if (window.Weather) actions = actions.concat(Weather.actions());
         if (window.RenderProbe) actions = actions.concat(RenderProbe.actions());
         if (window.PlatformProbe) actions = actions.concat(PlatformProbe.actions());
+        if (window.HA) actions = actions.concat(HA.actions());
+        if (window.MQTT && MQTT.configured()) actions.push({
+            label: 'MQTT: test connection to Home Assistant',
+            run: function () {
+                MQTT.test().then(function (m) { UI.toast(m); }, function (err) {
+                    UI.toast('MQTT: ' + DevLog.errorText(err));
+                });
+            }
+        });
         inputs().forEach(function (input) {
             var item = { kind: 'input', hdmi: input.hdmi, label: input.label };
             var name = input.label + ' (HDMI ' + input.hdmi + ')';
@@ -250,6 +290,7 @@
     }
 
     function launchApp(item) {
+        if (window.MQTT) MQTT.reportApp(item);
         runLogged('Launch ' + item.id, Apps.launch(item.id)).catch(function (err) {
             UI.toast('Could not open ' + item.label + ': ' + DevLog.errorText(err));
         });
@@ -257,6 +298,7 @@
 
     function openInput(item, method) {
         method = method || item.method || cfg.inputMethod;
+        if (window.MQTT) MQTT.reportApp({ label: item.label, id: 'hdmi' + item.hdmi });
         UI.toast('Switching to ' + item.label + '…');
         runLogged('Input HDMI ' + item.hdmi + ' via ' + method, Inputs.open(item.hdmi, method)).then(function (result) {
             log('Current source now: ' + Inputs.describeSource(Inputs.current()));
@@ -408,12 +450,16 @@
         UI.register('home', {
             el: $('home'),
             startRow: 1,
-            hints: [['OK', 'Open'], ['▲', 'Settings']],
-            rows: function () {
-                return [[$('gear')], UI.children($('apps-row')), UI.children($('inputs-row'))];
+            hints: function () {
+                return [['OK', 'Open'], ['▲', $('scenes-row').children.length ? 'Scenes · Settings' : 'Settings']];
             },
-            activate: function (item) {
-                if (item.kind === 'app') launchApp(item);
+            rows: function () {
+                return [UI.children($('scenes-row')).concat([$('gear')]),
+                    UI.children($('apps-row')), UI.children($('inputs-row'))];
+            },
+            activate: function (item, target) {
+                if (item.kind === 'scene') runScene(item, target);
+                else if (item.kind === 'app') launchApp(item);
                 else if (item.kind === 'all') UI.show('all');
                 else if (item.kind === 'input') openInput(item);
                 else if (item.kind === 'settings') UI.show('settings');
@@ -462,8 +508,14 @@
         var cached = readCache();
         if (cached && cached.length) setApps(cached);
         else renderHome();
+        if (window.HA) {
+            HA.onChange(renderScenes);
+            renderScenes();
+            setTimeout(function () { HA.refresh().catch(function () {}); }, 2500);
+        }
         UI.show('home');
         Wallpaper.start();
+        if (window.MQTT) { MQTT.start(); MQTT.reportHome(); }
 
         document.addEventListener('visibilitychange', function () {
             if (document.hidden) {
@@ -472,6 +524,9 @@
             }
             updateClock();
             refreshInputStatus();
+            // Back on the launcher's own screen (an app was closed, or we returned from a viewer).
+            if (window.MQTT && !state.tvMode) MQTT.reportHome();
+            if (window.HA) HA.refresh().catch(function () {});
             if (UI.isVisible('home')) Wallpaper.homeShown();
             if (Date.now() - state.lastFetch > REFRESH_AFTER_MS) setTimeout(loadApps, 1500);
         });
