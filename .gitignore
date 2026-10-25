@@ -61,3 +61,10 @@ native-snapshot.json
 .AppleDouble
 .Spotlight-V100
 .Trashes
+
+# TV remote-control token written by scripts/tv-apps.mjs
+scripts/.tv-token
+
+# Tizen Studio build/deploy artefacts
+src/.tizen-rds/
+src/Debug/
