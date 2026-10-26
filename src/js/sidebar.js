@@ -61,6 +61,8 @@
     var cardEls = {};      // entity -> [box]
     var camImgs = [];      // in-column camera <img>
     var panelMode = false; // true while building a read-only panel (e.g. the screen saver)
+    var panelCamImgs = []; // panel camera <img>, refreshed flicker-free alongside the live ones
+    var panelBoxes = [];   // panel card boxes, updated in place
     var camOverlay = null; // { img, base } when the pop-over is open
     var lastSig = '';
 
@@ -282,7 +284,7 @@
         var frame = el('div', 'ha-cam'), url = camUrl(s);
         if (url) {
             var img = new Image(); img.className = 'ha-cam-img'; img._base = url; img.src = bust(url);
-            frame.appendChild(img); if (!panelMode) camImgs.push(img);
+            frame.appendChild(img); (panelMode ? panelCamImgs : camImgs).push(img);
         } else if (s) { frame.classList.add('ha-cam-live'); }
         else { frame.appendChild(el('div', 'ha-cam-off', 'camera unavailable')); }
         b.appendChild(frame);
@@ -480,6 +482,7 @@
     function refreshCameras() {
         if (!online) return;
         camImgs.forEach(function (img) { if (img._base) swap(img, img._base); });
+        panelCamImgs.forEach(function (img) { if (img._base) swap(img, img._base); });
         if (camOverlay && camOverlay.base) swap(camOverlay.img, camOverlay.base);
     }
 
@@ -534,16 +537,37 @@
         // Build a read-only .ha-track from any dashboard config, using the live states.
         panelRender: function (config) {
             var track = el('div', 'ha-track');
+            panelCamImgs = []; panelBoxes = [];
             panelMode = true;
             try {
                 normalise(config).forEach(function (card) {
                     if (card.kind !== 'heading' && !card.entity) return;
                     if (!visible(card)) return;
-                    track.appendChild(buildCard(card));
+                    var box = buildCard(card);
+                    track.appendChild(box);
+                    if (card.entity) panelBoxes.push(box);
                 });
             } finally { panelMode = false; }
             return track;
         },
+        // Update a built panel in place: text rebuilt (no flicker), cameras point at the newest
+        // frame and are swapped flicker-free by refreshCameras. No full rebuild, so no camera reload.
+        panelRefresh: function () {
+            panelMode = true;
+            try {
+                panelBoxes.forEach(function (box) {
+                    if (box._card.kind === 'camera') {
+                        var s = getState(box._card.entity), img = box.querySelector('.ha-cam-img'), url = camUrl(s);
+                        if (img && url) img._base = url;
+                        return;
+                    }
+                    var fresh = buildCard(box._card);
+                    box.className = fresh.className;
+                    box.innerHTML = fresh.innerHTML;
+                });
+            } finally { panelMode = false; }
+        },
+        panelClear: function () { panelCamImgs = []; panelBoxes = []; },
         isMedia: function (box) { return box && box._card && box._card.kind === 'media'; },
         mediaControl: mediaControl,
         isCamera: function (box) { return box && box._card && box._card.kind === 'camera'; }

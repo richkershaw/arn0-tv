@@ -969,6 +969,18 @@ html.preview, html.preview body {
     background: linear-gradient(180deg, rgba(3, 4, 7, 0), rgba(3, 4, 7, 0.55));
 }
 
+/* Darkens the left of the screen, where the clock and dashboard sit, fading out toward the right,
+   so both read clearly over a bright wallpaper. */
+.ss-leftshade {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 62%;
+    background: linear-gradient(to right, rgba(5, 6, 10, 0.72) 0%, rgba(5, 6, 10, 0.42) 32%, rgba(5, 6, 10, 0) 100%);
+    pointer-events: none;
+}
+
 .ss-caption {
     position: absolute;
     left: var(--edge);

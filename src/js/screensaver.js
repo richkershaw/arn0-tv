@@ -81,6 +81,8 @@
     var haPhotos = [];              // [{id,title}] enumerated from HA media
     var dashCfg = null;             // the idle dashboard (tv-idle) config, shown in the sidebar slot
     var dashTimer = null;
+    var preloaded = null;           // {w,url} decoded ahead of idle so the first frame is instant
+    var PREFETCH_LEAD = 8000;       // begin the prefetch this long before the idle delay elapses
     // Stand-in used in desktop preview, where there is no HA backend to read tv-idle from.
     var SS_MOCK_DASH = { views: [{ sections: [{ cards: [
         { type: 'heading', heading: 'Overnight' },
@@ -115,6 +117,15 @@
                            .map(function (c) { return { id: c.media_content_id, title: cleanTitle(c.title) }; });
             DevLog.log('Screen saver: ' + haPhotos.length + ' HA wallpapers');
         }, function (e) { DevLog.log('Screen saver wallpapers: ' + DevLog.errorText(e)); });
+    }
+
+    // Resolve + decode the first photo shortly before the saver opens, so idle never starts black.
+    function prefetch() {
+        var w = photoAt(startIndex());
+        if (!w) return;
+        var done = function (url) { var img = new Image(); img.onload = function () { preloaded = { w: w, url: url }; }; img.src = url; };
+        if (w.id) HA.resolveMedia(w.id).then(function (r) { done(r.url); }, function () {});
+        else done(w.file);
     }
 
     function rotating() {
@@ -340,11 +351,18 @@
         loadDashConfig();
         renderDash();
         if (dashTimer) clearInterval(dashTimer);
-        dashTimer = setInterval(function () { if (open && dashShown()) renderDash(); }, 12000);
+        dashTimer = setInterval(function () { if (open && dashShown() && Sidebar.panelRefresh) Sidebar.panelRefresh(); }, 6000);
 
-        var w = photoAt(photoIndex);
-        caption(w);
-        showPhoto(w);
+        if (preloaded) {
+            var pf = preloaded; preloaded = null;
+            caption(pf.w);
+            photoToken++;
+            paintPhoto(photoToken, pf.url);
+        } else {
+            var w = photoAt(photoIndex);
+            caption(w);
+            showPhoto(w);
+        }
         DevLog.log('Screen saver on');
     }
 
@@ -380,6 +398,7 @@
         lastInput = Date.now();
         photoToken++;
         if (dashTimer) { clearInterval(dashTimer); dashTimer = null; }
+        if (window.Sidebar && Sidebar.panelClear) Sidebar.panelClear();
         var dash = $('ss-dash'); if (dash) { dash.innerHTML = ''; dash.classList.add('hidden'); }
         // Dropping the images releases two full-screen textures on a 2 GB device.
         layers.forEach(function (l) {
@@ -428,7 +447,10 @@
                 tick();
                 return;
             }
-            if (eligible() && Date.now() - lastInput >= delay().ms) openSaver();
+            if (!eligible()) return;
+            var idleFor = Date.now() - lastInput;
+            if (idleFor >= delay().ms) openSaver();
+            else if (idleFor >= delay().ms - PREFETCH_LEAD && !preloaded) prefetch();
         }, POLL_MS);
     }
 
