@@ -70,13 +70,15 @@ under native/. Do not change Home or startup behaviour.
 ```
 
 TV work is different in kind: it needs a machine on the same network as the TV, so an agent that
-can only read this repo cannot operate the TV. This repository includes the guarded helper source,
-but does not include a ready-to-run SDB staging/runner script or a per-TV recovery snapshot.
+can only read this repo cannot operate the TV. The guarded helper source is in `native/`, and the
+reviewed runner that stages and drives it over SDB is in
+[`scripts/native-home/`](scripts/native-home/README.md).
 
 ## Put it on a TV
 
 **[docs/setup-tv.md](docs/setup-tv.md)** — installing the package, then optionally the Home button
-and power-on changes, with the recovery steps for each.
+and power-on changes, with the recovery steps for each. Part 2 is driven by the runner in
+[`scripts/native-home/`](scripts/native-home/README.md).
 
 Installing the launcher is reversible by uninstalling it. The Home-button change is reversible
 with the saved per-device baseline, but it rewrites undocumented platform preferences. The
@@ -87,6 +89,7 @@ Evidence and limits:
 | | |
 | --- | --- |
 | Reference device | QE65Q70BATXXC (Q70B, 2022), firmware T-PTMDEUC-1720.7, Tizen 6.5, armv7 |
+| This fork | QE65LS03BAUXXU (The Frame, 2022), same firmware string. Art Mode interaction untested; native Home not yet run on a Frame |
 | Install | `.wgt` via Apps2Samsung or Tizen Studio CLI; works |
 | Home button | Tested on the reference device: opens `Arn0Lnchr0.Launcher` |
 | Power-on | `auto_start` was `1` and remains `1`; the helper does not change it. Cold-boot behaviour has not been independently validated as part of the Home-button change |
@@ -103,6 +106,12 @@ npm run preview      # browser preview on :8080
 npm run build        # -> dist/arn0-launcher.wgt
 npm run devlog       # receive Lab logs from the TV into logs/tv.jsonl
 node scripts/prepare-wallpapers.mjs <folder>   # regenerate wallpapers from your photos
+
+# Native Home (optional; read docs/setup-tv.md first). Needs device.local.json.
+npm run native:build     # build the guarded helpers -> native/build/ (needs the .NET SDK)
+npm run native:inspect   # read-only environment probe of the TV over SDB
+npm run native:query     # read-only: current Home and startup values
+npm run native:test      # unit-test the runner's pure logic (no TV needed)
 ```
 
 ### Remote
@@ -147,7 +156,8 @@ src/                  everything that goes into the .wgt
   js/platform-probe.js  reports which tizen.* / webapis.* APIs the TV exposes (Lab screen only)
   js/boot.js          start-up
   js/tizen-mock.js    fake Tizen APIs for the browser preview (inactive on the TV)
-scripts/              build.sh, serve.mjs, devlog-server.mjs, fetch-assets.mjs, make-icon.mjs
+scripts/              build.sh, serve.mjs, devlog-server.mjs, fetch-assets.mjs, make-icon.mjs,
+                      tv-apps.mjs; native-home/ is the guarded Home/startup runner
 native/               guarded Home/startup helpers — read docs/setup-tv.md first
 docs/                 setup guide
 ```

@@ -23,6 +23,11 @@ helper run elsewhere; the calls have not been validated on other hardware.
 No compatibility claim for any other model, year or firmware. Tizen 7/8/9 TVs, The Frame, and
 other regions' firmware are all untested here.
 
+> **This fork.** It targets one TV — a 2022 Samsung The Frame, `QE65LS03BAUXXU` (LS03B), Tizen
+> 6.5, firmware `T-PTMDEUC-1720.7`. That is the same firmware string the helpers guard on, and
+> the guard does not check the model. Art Mode makes a Frame different from the reference Q70B;
+> read *Art Mode and cold boot* under Part 2 before you change Home.
+
 ## Part 1 — install the launcher
 
 Prerequisites: Node.js 20+, and the TV in Developer Mode on the same network.
@@ -93,31 +98,37 @@ Safety properties worth knowing before you trust it:
 - `restore` refuses if a value changed to something that is neither the baseline nor the launcher,
   on the grounds that something else has been editing these keys and you should look first.
 
+### The runner
+
+The runner this guide refers to now ships with the project:
+[`scripts/native-home/`](../scripts/native-home/README.md). A plain `sdb shell` is not
+sufficient on these TVs — the interactive shell is closed to the SDK user — so the runner uses
+the SVE-2025-50109 "package-name" injection to run one script on the TV as uid=901 (**not**
+root), stages the helper beside it, and streams the output back over a loopback callback. Use it;
+do not hand-run `sdb shell` or substitute your own command. Method credit:
+[CleanFrame](https://github.com/nthnclrk/CleanFrame), which documented it on a 2024 Frame.
+
 ### Order of operations
 
-Do these in order. Do not skip step 2.
+Do these in order. Do not skip the query.
 
-1. **Connect.** `sdb connect <TV_IP>`, then `sdb devices` to confirm the TV accepted it. This is
-   a connection and changes nothing; `sdb disconnect` undoes it.
+1. **Build and configure.** `npm run native:build` (needs the .NET SDK). Copy
+   `scripts/native-home/device.local.example.json` to `device.local.json` and set `host` (TV IP)
+   and `sdb` (path to Tizen Studio's `sdb`). The TV must be in Developer Mode on the same network.
 
-2. **Query, read-only.** Build and run `Arn0HomeQuery` first, before `Arn0HomeControl` exists on
-   the TV at all. You are checking three things: the guards pass, the keys read back values you
+2. **Inspect, read-only.** `npm run native:inspect`. It confirms the environment the guards need:
+   uid, architecture, firmware, the .NET runtime, the current `vconftool` values and the native
+   libraries. It changes nothing.
+
+3. **Query, read-only.** `npm run native:query` runs `Arn0HomeQuery` — before `Arn0HomeControl`
+   is staged at all. You are checking three things: the guards pass, the keys read back values you
    recognise, and `launcher_boot_supported=1`. If that last one is `0`, the TV is telling you the
    app is not eligible for boot and `apply` will refuse anyway — stop and investigate.
 
-   The repository contains the query source and project file, but does not include the private
-   SDB runner used for the reference-device session. A normal `sdb shell` is not sufficient on
-   this Samsung TV. Do not improvise a command or substitute a different execution method. Until
-   you have a reviewed runner that stages the helper, runs it under the expected UID, captures its
-   output, and cleans up temporary files, treat the native helper as source for review rather
-   than a ready-to-run procedure. The runner must verify the exact device and firmware before any
-   invocation.
-
-3. **Save the baseline.** Write the query output to a JSON file off the TV, in the shape
-   `Control.cs` expects:
-
-   The following is only the reference TV's baseline. **Do not copy these values as your own**;
-   use the exact values returned by your TV's query.
+4. **Save the baseline.** Write the query output to a JSON file off the TV, in the shape
+   `Control.cs` expects. **Use your TV's own values, never the reference ones**, and keep the file
+   somewhere you will still have it after a bad evening — not only on the TV and not only in the
+   repo. `.gitignore` excludes `*-baseline.json` and `original-*.json`; a baseline is per-device.
 
    ```json
    {
@@ -132,23 +143,38 @@ Do these in order. Do not skip step 2.
    }
    ```
 
-   Keep it somewhere you will still have it after a bad evening — not only on the TV, and not only
-   in the repo. `.gitignore` deliberately excludes these files; a baseline is per-device and
-   publishing mine would help nobody.
+5. **Verify the baseline.** `npm run native:verify -- <baseline.json>`. It compares the live values
+   against the file and prints `ARN0_BASELINE_MATCH=` on success. Nothing is written.
 
-4. **Verify the baseline.** Run `Arn0HomeControl verify <baseline.json>`. It compares the live
-   values against the file and prints `ARN0_BASELINE_MATCH=` on success. This proves the file is
-   readable, correctly shaped, and actually matches the TV before anything is written.
+6. **Apply.** `npm run native:apply -- <baseline.json>`. The runner asks you to type `APPLY`
+   first, and refuses outright if the baseline's `Autostart` is `0`. A successful result prints
+   `ARN0_APPLIED=` and a read-back of the Home operation, `home_appid` and `auto_start`. Test Home
+   from another app, then do the physical checks below. The helper does not change power-on
+   settings; validate cold-start behaviour separately before claiming it works.
 
-5. **Apply.** Only after query and baseline verification, run `Arn0HomeControl apply
-   <baseline.json>` through the reviewed, device-guarded runner. A successful result prints
-   `ARN0_APPLIED=` and includes a read-back of the Home operation, `home_appid`, and `auto_start`.
-   Test Home from another app. The helper does not change power-on settings; validate cold-start
-   behavior separately before claiming it works.
+7. **Know your way back.** `npm run native:restore -- <baseline.json>` restores all saved Home and
+   startup values and prints `ARN0_RESTORED=`.
 
-6. **Know your way back.** `Arn0HomeControl restore <baseline.json>` restores all saved Home and
-   startup values and prints `ARN0_RESTORED=`. Use the same reviewed runner that ran the query and
-   apply operations.
+### Art Mode and cold boot (Samsung The Frame)
+
+`apply` writes the `main` app-control operation and `db/appfw/home_appid`, and writes `auto_start`
+back unchanged. On a Frame this interacts with Art Mode, and arn0 rated the Frame untested — treat
+it as an experiment, not a supported flow.
+
+- **Not at risk.** The Art Mode app (`org.tizen.art-app`: artwork, mattes, brightness) and
+  entering/leaving Art Mode with the Power key, which is a firmware event rather than the Home
+  operation.
+- **Can change.** Where the Home button goes, and what appears at cold boot, because `home_appid`
+  is what the boot manager uses to choose the Home app. A Frame often wakes into Art Mode, so this
+  is the behaviour to watch.
+- **The `auto_start = 0` gate.** If your baseline's `Autostart` is `0`, stop and research that case
+  before applying. The runner enforces this and will not stage the write-capable helper.
+
+Before keeping any apply, confirm on the TV: the launcher's **Settings → Samsung Home** entry
+opens something usable, the **Power-key art toggle** still works, a **cold start** lands where you
+expect, and the **art screen** still renders and exits. Keep the baseline and the runner available
+throughout — on a Frame the art app can wedge and stop answering its own power key, and a power
+cycle is the usual fix.
 
 ## Recovery
 
