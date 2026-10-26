@@ -1,14 +1,15 @@
-# Arn0 Launcher
+# Samsung Frame TV Launcher
 
-A quieter home screen for a Samsung Tizen TV: a clock, a row of your apps, a row of your consoles,
-and nothing else.
+A quieter home screen for a Samsung Frame TV running Tizen 6.5: a clock, a row of your apps, a row of your consoles,
+an optional sidebar with Home Assistant dashboard entities and nothing else.
 
 ![The launcher on the "Milky Way" wallpaper, showing the clock, an apps row and a consoles row](docs/preview.png)
 
 *The browser preview, with the bundled Manrope font and the "Milky Way" wallpaper.*
 
-I built this for one TV in my living room, a Samsung Q70B on Tizen 6.5, because its own home
-screen had become a shop. It does what I want: the apps I use, the consoles I own, driven by the normal remote. I am sharing it as a starting point rather than a product.
+This is forked from [NelsonEU's arn0 project](https://github.com/NelsonEU/arn0-tv), built for one TV in their living room, 
+a Samsung Q70B on Tizen 6.5, because its own home screen had become a shop. This fork has been modified to add support for
+Home Assistant dashboard entities displayed in a sidebar, and to make the layout a little more space-efficient on larger TVs.
 
 **Use it at your own risk.** The optional Home-button setup changes TV preferences that Samsung
 does not document. See [the setup guide](docs/setup-tv.md) before using it.
