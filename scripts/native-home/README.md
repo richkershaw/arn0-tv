@@ -63,6 +63,8 @@ npm run native:query          # -> save the ARN0_QUERY / QUERY output as a basel
 npm run native:verify  -- <baseline.json>
 #   -> physical checks (see below)
 npm run native:apply   -- <baseline.json>
+#   -> on a Frame, REBOOT the TV now: the Home key does not pick up the
+#      change until the TV restarts, even though the read-back is already correct
 npm run native:restore -- <baseline.json>     # the way back
 ```
 

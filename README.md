@@ -89,7 +89,7 @@ Evidence and limits:
 | | |
 | --- | --- |
 | Reference device | QE65Q70BATXXC (Q70B, 2022), firmware T-PTMDEUC-1720.7, Tizen 6.5, armv7 |
-| This fork | QE65LS03BAUXXU (The Frame, 2022), same firmware string. Art Mode interaction untested; native Home not yet run on a Frame |
+| This fork | QE65LS03BAUXXU (The Frame, 2022), same firmware string. Home button confirmed opening the launcher **after a reboot**; Art Mode and cold boot still untested |
 | Install | `.wgt` via Apps2Samsung or Tizen Studio CLI; works |
 | Home button | Tested on the reference device: opens `Arn0Lnchr0.Launcher` |
 | Power-on | `auto_start` was `1` and remains `1`; the helper does not change it. Cold-boot behaviour has not been independently validated as part of the Home-button change |

@@ -152,6 +152,10 @@ Do these in order. Do not skip the query.
    from another app, then do the physical checks below. The helper does not change power-on
    settings; validate cold-start behaviour separately before claiming it works.
 
+   **On a Frame, reboot the TV before concluding apply failed.** The read-back is correct the
+   moment `apply` returns, but the Home key kept opening Samsung Home until the TV was restarted
+   (confirmed on `QE65LS03BAUXXU`). Reboot, then test Home from another app.
+
 7. **Know your way back.** `npm run native:restore -- <baseline.json>` restores all saved Home and
    startup values and prints `ARN0_RESTORED=`.
 
