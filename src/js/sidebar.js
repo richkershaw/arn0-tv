@@ -50,7 +50,8 @@
         'input_text.dishwasher_state': st('Running · 42 min left'),
         'light.living_room': st('on', { brightness: 180 }), 'light.kitchen': st('off'),
         'light.workshop': st('off'),
-        'weather.pirateweather': st('partlycloudy', { temperature: 12 })
+        'weather.pirateweather': st('partlycloudy', { temperature: 12 }),
+        'media_player.living_room': st('playing', { media_title: 'Weightless', media_artist: 'Marconi Union', app_name: 'Spotify', media_content_id: 'spotify:track:6kkworjozcz' })
     };
 
     var cards = [];        // normalised
@@ -147,6 +148,32 @@
         return cards.filter(function (c) { return (c.kind === 'heading' || c.entity) && visible(c); })
             .map(function (c) { return c.kind + ':' + (c.entity || c.name); }).join('|');
     }
+    // The most relevant media player that is playing (preferred) or paused, if any.
+    function activeMedia() {
+        var best = null, bestScore = -1;
+        for (var e in states) {
+            if (e.indexOf('media_player.') !== 0 || !states.hasOwnProperty(e)) continue;
+            var s = states[e]; if (!s) continue;
+            var rank = s.state === 'playing' ? 2 : (s.state === 'paused' ? 1 : 0);
+            if (!rank) continue;
+            var t = Date.parse(s.last_updated || s.last_changed) || 0;
+            var score = rank * 1e14 + t;
+            if (score > bestScore) { bestScore = score; best = e; }
+        }
+        return best;
+    }
+    // Structural signature: a full re-render is needed when this changes (visible set
+    // or which media player is active); play/pause and track changes are patched in place.
+    function structSig() { return visSig() + '|np=' + (activeMedia() || ''); }
+    function mediaSub(s) {
+        var a = s.attributes || {}, bits = [];
+        if (a.media_artist) bits.push(a.media_artist);
+        else if (a.media_series_title) bits.push(a.media_series_title);
+        else if (a.media_channel) bits.push(a.media_channel);
+        if (a.app_name) bits.push(a.app_name);
+        else if (!bits.length && a.friendly_name) bits.push(a.friendly_name);
+        return bits.join(' \u00b7 ');
+    }
 
     // ---- formatting ----
     function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
@@ -185,6 +212,13 @@
         return box;
     }
 
+    var MC_SVG = {
+        prev: '<svg viewBox="0 0 24 24"><path d="M7 6h2.2v12H7zM19 6 9.5 12 19 18z"/></svg>',
+        next: '<svg viewBox="0 0 24 24"><path d="M14.8 6H17v12h-2.2zM5 6l9.5 6L5 18z"/></svg>',
+        play: '<svg viewBox="0 0 24 24"><path d="M7 5v14l11-7z"/></svg>',
+        pause: '<svg viewBox="0 0 24 24"><path d="M6.5 5h3.3v14H6.5zM14.2 5h3.3v14h-3.3z"/></svg>',
+        note: '<svg viewBox="0 0 24 24"><path d="M9 17V5l10-2v12" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="6.5" cy="17.5" r="2.6"/><circle cx="16.5" cy="15.5" r="2.6"/></svg>'
+    };
     function renderHeading(card) { return el('div', 'ha-head', card.name); }
     function renderLight(card) {
         var s = getState(card.entity);
@@ -253,8 +287,46 @@
         b.appendChild(frame);
         return b;
     }
+    function setArt(art, s) {
+        var pic = window.HA && HA.entityPicture ? HA.entityPicture(s) : null;
+        art.className = 'ha-media-art';
+        art.innerHTML = '';
+        if (pic) { var img = new Image(); img.className = 'ha-media-img'; img.src = pic; art.appendChild(img); }
+        else { art.classList.add('ha-media-art-empty'); art.innerHTML = MC_SVG.note; }
+    }
+    function renderMedia(card) {
+        var s = getState(card.entity);
+        var box = el('div', 'ha-card ha-media ha-focusable');
+        box._card = card;
+        if (!s) { box.appendChild(el('div', 'ha-media-title', 'Nothing playing')); return box; }
+        box._track = s.attributes.media_content_id || s.attributes.media_title || '';
+        var top = el('div', 'ha-media-top'), art = el('div', 'ha-media-art');
+        setArt(art, s); top.appendChild(art);
+        var info = el('div', 'ha-media-info');
+        info.appendChild(el('div', 'ha-media-title', s.attributes.media_title || cap(s.state)));
+        info.appendChild(el('div', 'ha-media-sub', mediaSub(s)));
+        top.appendChild(info); box.appendChild(top);
+        var ctl = el('div', 'ha-media-ctl');
+        var prev = el('span', 'ha-mc'); prev.innerHTML = MC_SVG.prev;
+        var pp = el('span', 'ha-mc ha-mc-pp'); pp.innerHTML = s.state === 'playing' ? MC_SVG.pause : MC_SVG.play;
+        var next = el('span', 'ha-mc'); next.innerHTML = MC_SVG.next;
+        ctl.appendChild(prev); ctl.appendChild(pp); ctl.appendChild(next);
+        box.appendChild(ctl);
+        return box;
+    }
+    // Patch the media card in place; reload artwork only when the track changes (no flicker).
+    function updateMediaBox(box) {
+        var s = getState(box._card.entity);
+        if (!s || (s.state !== 'playing' && s.state !== 'paused')) { render(); return; }
+        var t = box.querySelector('.ha-media-title'); if (t) t.textContent = s.attributes.media_title || cap(s.state);
+        var sub = box.querySelector('.ha-media-sub'); if (sub) sub.textContent = mediaSub(s);
+        var pp = box.querySelector('.ha-mc-pp'); if (pp) pp.innerHTML = s.state === 'playing' ? MC_SVG.pause : MC_SVG.play;
+        var track = s.attributes.media_content_id || s.attributes.media_title || '';
+        if (track !== box._track) { box._track = track; var art = box.querySelector('.ha-media-art'); if (art) setArt(art, s); }
+    }
     var RENDER = { heading: renderHeading, light: renderLight, switch: renderSwitch, button: renderButton,
-        number: renderNumber, climate: renderClimate, sensor: renderSensor, weather: renderWeather, camera: renderCamera };
+        number: renderNumber, climate: renderClimate, sensor: renderSensor, weather: renderWeather,
+        camera: renderCamera, media: renderMedia };
     function buildCard(card) { return (RENDER[card.kind] || renderSensor)(card); }
 
     // ---- clock ----
@@ -275,6 +347,12 @@
         col.appendChild(clockCard());
         var scroll = el('div', 'ha-scroll'), track = el('div', 'ha-track');
         scroll.appendChild(track); col.appendChild(scroll);
+        var np = activeMedia();
+        if (np) {
+            var mbox = buildCard({ kind: 'media', entity: np, name: 'Now Playing' });
+            track.appendChild(mbox);
+            (cardEls[np] = cardEls[np] || []).push(mbox);
+        }
         cards.forEach(function (card) {
             if (card.kind !== 'heading' && !card.entity) return;
             if (!visible(card)) return;
@@ -282,7 +360,7 @@
             track.appendChild(box);
             if (card.entity) (cardEls[card.entity] = cardEls[card.entity] || []).push(box);
         });
-        lastSig = visSig();
+        lastSig = structSig();
         tickClock();
         alignApps();
         if (window.Home && Home.reSidebarFocus) Home.reSidebarFocus();
@@ -295,6 +373,7 @@
         else render();                            // gained/lost a frame -> structure changed
     }
     function updateBox(box) {
+        if (box._card.kind === 'media') { updateMediaBox(box); return; }
         if (box._card.kind === 'camera') { updateCameraBox(box); return; }
         var fresh = buildCard(box._card), focused = box.classList.contains('focused');
         box.className = fresh.className + (focused ? ' focused' : '');
@@ -302,7 +381,7 @@
     }
     function refresh(entity) {
         if (!online) return;
-        if (visSig() !== lastSig) { render(); return; }      // visibility/structure changed
+        if (structSig() !== lastSig) { render(); return; }      // visibility/structure changed
         if (entity && cardEls[entity]) cardEls[entity].forEach(updateBox);
     }
 
@@ -344,7 +423,8 @@
             if (dom === 'scene') p = HA.callService('scene', 'turn_on', e);
             else if (dom === 'script') p = HA.callService('script', 'turn_on', e);
             else p = HA.callService(dom, 'press', e);
-        } else { return; }
+        } else if (c.kind === 'media') { p = HA.callService('media_player', 'media_play_pause', e); }
+        else { return; }
         if (p) p.then(null, function (err) { UI.toast('HA: ' + DevLog.errorText(err)); });
         box.classList.add('ha-busy'); setTimeout(function () { box.classList.remove('ha-busy'); }, 250);
     }
@@ -362,6 +442,11 @@
             s.attributes.temperature = nt; refresh(c.entity);
             HA.callService('climate', 'set_temperature', c.entity, { temperature: nt }).then(null, function (err) { UI.toast('HA: ' + DevLog.errorText(err)); });
         }
+    }
+    function mediaControl(box, dir) {
+        var svc = dir < 0 ? 'media_previous_track' : 'media_next_track';
+        HA.callService('media_player', svc, box._card.entity).then(null, function (err) { UI.toast('HA: ' + DevLog.errorText(err)); });
+        box.classList.add('ha-busy'); setTimeout(function () { box.classList.remove('ha-busy'); }, 250);
     }
 
     // ---- camera pop-over ----
@@ -416,7 +501,7 @@
         var home = $('home'); if (!home) return;
         if (!$('sidebar')) { var aside = el('aside'); aside.id = 'sidebar'; home.insertBefore(aside, home.firstChild); }
 
-        setInterval(function () { if (online && visSig() !== lastSig) render(); }, 30000);  // day/night flip
+        setInterval(function () { if (online && structSig() !== lastSig) render(); }, 30000);  // day/night flip
         setInterval(refreshCameras, 4000);
         setInterval(tickClock, 10000);
 
@@ -445,6 +530,8 @@
         openCamera: openCamera,
         closeCamera: closeCamera,
         isStepper: function (box) { return box && box._card && (box._card.kind === 'number' || box._card.kind === 'climate'); },
+        isMedia: function (box) { return box && box._card && box._card.kind === 'media'; },
+        mediaControl: mediaControl,
         isCamera: function (box) { return box && box._card && box._card.kind === 'camera'; }
     };
 })();

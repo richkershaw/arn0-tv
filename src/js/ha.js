@@ -52,7 +52,7 @@
 
     // ---- WebSocket ----
     var ws = null, msgId = 1, connected = false, reconnectT = null;
-    var handlers = {}, subId = null, cfgId = null;
+    var handlers = {}, subId = null, cfgId = null, lovelaceSubId = null;
 
     function nextId() { return msgId++; }
     function sendWS(o) { try { ws.send(JSON.stringify(o)); } catch (e) {} }
@@ -72,6 +72,13 @@
         }).catch(function (e) { log('HA get_states: ' + DevLog.errorText(e)); });
         subId = nextId();
         sendWS({ id: subId, type: 'subscribe_events', event_type: 'state_changed' });
+        // Hot-reload the dashboard when it is edited in HA.
+        lovelaceSubId = nextId();
+        sendWS({ id: lovelaceSubId, type: 'subscribe_events', event_type: 'lovelace_updated' });
+    }
+    function refetchConfig() {
+        cfgId = nextId();
+        sendWS({ id: cfgId, type: 'lovelace/config', url_path: cfg.sidebar || null });
     }
 
     function onMessage(raw) {
@@ -83,6 +90,11 @@
         if (m.type === 'result' && m.id === cfgId) {
             if (m.success && m.result && handlers.onConfig) handlers.onConfig(m.result);
             else if (!m.success) log('HA dashboard "' + (cfg.sidebar || '') + '" not readable');
+            return;
+        }
+        if (m.type === 'event' && m.id === lovelaceSubId && m.event) {
+            var d = m.event.data || {};
+            if ((d.url_path || null) === (cfg.sidebar || null)) { log('HA dashboard changed; reloading config'); refetchConfig(); }
             return;
         }
         if (m.type === 'event' && m.id === subId && m.event && m.event.data) {

@@ -466,8 +466,8 @@
         }
         if (k === KEY.UP) { if (sbState.i > 0) { sbState.i--; sbHighlight(); } return true; }
         if (k === KEY.DOWN) { if (sbState.i < els.length - 1) { sbState.i++; sbHighlight(); } return true; }
-        if (k === KEY.LEFT) { if (box && Sidebar.isStepper(box)) Sidebar.adjust(box, -1); return true; }
-        if (k === KEY.RIGHT) { if (box && Sidebar.isStepper(box)) Sidebar.adjust(box, 1); else exitSidebar(); return true; }
+        if (k === KEY.LEFT) { if (box && Sidebar.isStepper(box)) Sidebar.adjust(box, -1); else if (box && Sidebar.isMedia(box)) Sidebar.mediaControl(box, -1); return true; }
+        if (k === KEY.RIGHT) { if (box && Sidebar.isStepper(box)) Sidebar.adjust(box, 1); else if (box && Sidebar.isMedia(box)) Sidebar.mediaControl(box, 1); else exitSidebar(); return true; }
         if (k === KEY.ENTER) {
             if (box && Sidebar.isCamera(box)) { Sidebar.openCamera(box._card.entity); sbState.camOpen = true; UI.refreshHints(); }
             else if (box) Sidebar.activate(box);
@@ -483,9 +483,10 @@
             startRow: 1,
             hints: function () {
                 if (sbState.camOpen) return [['Back', 'Close']];
-                return sbState.active
-                    ? [['OK', 'Toggle'], ['◀ ▶', 'Adjust'], ['Back', 'Apps']]
-                    : [['OK', 'Open'], ['▲', 'Settings']];
+                if (!sbState.active) return [['OK', 'Open'], ['▲', 'Settings']];
+                var fb = sbEls()[sbState.i];
+                if (fb && Sidebar.isMedia(fb)) return [['OK', 'Play/Pause'], ['◀ ▶', 'Track'], ['Back', 'Apps']];
+                return [['OK', 'Toggle'], ['◀ ▶', 'Adjust'], ['Back', 'Apps']];
             },
             onKey: function (k) {
                 if (sbState.active) return sbKey(k);

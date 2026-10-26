@@ -1151,6 +1151,22 @@ html.preview, html.preview body {
 .ha-button { display: flex; align-items: center; justify-content: center; min-height: 54px; background: rgba(255, 255, 255, 0.09); }
 .ha-btn-label { font-size: 25px; font-weight: 600; text-align: center; }
 
+/* Now Playing card. */
+.ha-media-top { display: flex; align-items: center; gap: 14px; }
+.ha-media-art { flex: 0 0 auto; width: 58px; height: 58px; border-radius: 10px; overflow: hidden; background: rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: center; color: var(--muted); }
+.ha-media-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ha-media-art svg { width: 26px; height: 26px; fill: currentColor; }
+.ha-media-info { flex: 1 1 auto; min-width: 0; }
+.ha-media-title { font-size: 20px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ha-media-sub { margin-top: 2px; font-size: 16px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ha-media-ctl { display: flex; align-items: center; justify-content: center; gap: 36px; margin-top: 13px; }
+.ha-mc { display: inline-flex; align-items: center; justify-content: center; }
+.ha-mc svg { width: 25px; height: 25px; fill: var(--fg); display: block; }
+.ha-mc-pp svg { width: 30px; height: 30px; }
+.ha-focusable.focused .ha-media-sub { color: rgba(9, 11, 16, 0.55); }
+.ha-focusable.focused .ha-mc svg { fill: var(--bg); }
+.ha-focusable.focused .ha-media-art { background: rgba(9, 11, 16, 0.12); color: rgba(9, 11, 16, 0.5); }
+
 .ha-name {
     font-size: 19px;
     font-weight: 600;
