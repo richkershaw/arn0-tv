@@ -163,55 +163,82 @@
     }
     function value(box, text, cls) { box.appendChild(el('div', 'ha-value' + (cls ? ' ' + cls : ''), text)); }
     function pill(box, on) { box.appendChild(el('div', 'ha-pill' + (on ? ' on' : ''), on ? 'On' : 'Off')); }
-    function stepper(box, text) {
+    function stepper(target, text) {
         var row = el('div', 'ha-stepper');
         row.appendChild(el('span', 'ha-step ha-down', '−'));
         row.appendChild(el('span', 'ha-value', text));
         row.appendChild(el('span', 'ha-step ha-up', '+'));
-        box.appendChild(row);
+        target.appendChild(row);
     }
     function unavail(box) { value(box, 'unavailable', 'muted'); }
+    function pillEl(on) { return el('div', 'ha-pill' + (on ? ' on' : ''), on ? 'On' : 'Off'); }
+    function kvText(txt, muted) { return el('div', 'ha-kv-main' + (muted ? ' muted' : ''), txt); }
+    // Read-out / toggle card: name on the left (wraps), value on the right.
+    function kvCard(card, valEl, subText) {
+        var box = el('div', 'ha-card ha-kv ha-focusable');
+        box._card = card;
+        box.appendChild(el('div', 'ha-kv-name', card.name || ''));
+        var v = el('div', 'ha-kv-val');
+        v.appendChild(valEl);
+        if (subText) v.appendChild(el('div', 'ha-kv-sub', subText));
+        box.appendChild(v);
+        return box;
+    }
 
     function renderHeading(card) { return el('div', 'ha-head', card.name); }
     function renderLight(card) {
-        var s = getState(card.entity), b = shell(card, true);
-        if (!s) { unavail(b); return b; }
-        var on = s.state === 'on'; pill(b, on);
-        if (on && s.attributes.brightness != null) b.appendChild(el('div', 'ha-sub', Math.round(s.attributes.brightness / 255 * 100) + '%'));
-        return b;
+        var s = getState(card.entity);
+        if (!s) return kvCard(card, kvText('unavailable', true));
+        var on = s.state === 'on';
+        return kvCard(card, pillEl(on), (on && s.attributes.brightness != null) ? Math.round(s.attributes.brightness / 255 * 100) + '%' : null);
     }
     function renderSwitch(card) {
-        var s = getState(card.entity), b = shell(card, true);
-        if (!s) { unavail(b); return b; } pill(b, s.state === 'on'); return b;
+        var s = getState(card.entity);
+        if (!s) return kvCard(card, kvText('unavailable', true));
+        return kvCard(card, pillEl(s.state === 'on'));
     }
-    function renderButton(card) { var b = shell(card, true); b.appendChild(el('div', 'ha-press', 'Press')); return b; }
+    function renderButton(card) {
+        var box = el('div', 'ha-card ha-button ha-focusable');
+        box._card = card;
+        box.appendChild(el('div', 'ha-btn-label', card.name || card.entity));
+        return box;
+    }
+    function stepShell(card) {
+        var box = el('div', 'ha-card ha-' + card.kind + ' ha-focusable');
+        box._card = card;
+        var row = el('div', 'ha-kv');
+        row.appendChild(el('div', 'ha-kv-name', card.name || ''));
+        box.appendChild(row);
+        box._kv = row;
+        return box;
+    }
     function renderNumber(card) {
-        var s = getState(card.entity), b = shell(card, true);
-        if (!s) { unavail(b); return b; }
-        stepper(b, (num(s.state) != null ? fmt(num(s.state)) : s.state) + (s.attributes.unit_of_measurement || ''));
+        var s = getState(card.entity);
+        if (!s) return kvCard(card, kvText('unavailable', true));
+        var b = stepShell(card);
+        stepper(b._kv, (num(s.state) != null ? fmt(num(s.state)) : s.state) + (s.attributes.unit_of_measurement || ''));
         return b;
     }
     function renderClimate(card) {
-        var s = getState(card.entity), b = shell(card, true);
-        if (!s) { unavail(b); return b; }
-        stepper(b, (s.attributes.temperature != null ? fmt(s.attributes.temperature) + '°' : '—'));
+        var s = getState(card.entity);
+        if (!s) return kvCard(card, kvText('unavailable', true));
+        var b = stepShell(card);
+        stepper(b._kv, (s.attributes.temperature != null ? fmt(s.attributes.temperature) + '°' : '—'));
         var cur = s.attributes.current_temperature;
         b.appendChild(el('div', 'ha-sub', (cur != null ? 'now ' + fmt(cur) + '° · ' : '') + cap(s.state)));
         return b;
     }
     function renderSensor(card) {
-        var s = getState(card.entity), b = shell(card, true);
-        if (!s) { unavail(b); return b; }
+        var s = getState(card.entity);
+        if (!s) return kvCard(card, kvText('unavailable', true));
         var u = s.attributes.unit_of_measurement || '';
-        value(b, (num(s.state) != null ? fmt(num(s.state)) : s.state) + (u ? ' ' + u : ''));
-        return b;
+        return kvCard(card, kvText((num(s.state) != null ? fmt(num(s.state)) : s.state) + (u ? ' ' + u : '')));
     }
     function renderWeather(card) {
-        var s = getState(card.entity), b = shell(card, true);
-        if (!s) { unavail(b); return b; }
-        value(b, (s.attributes.temperature != null ? fmt(s.attributes.temperature) + '°' : '—'));
-        b.appendChild(el('div', 'ha-sub', cap(String(s.state).replace(/[-_]/g, ' '))));
-        return b;
+        var s = getState(card.entity);
+        if (!s) return kvCard(card, kvText('unavailable', true));
+        return kvCard(card, kvText(s.attributes.temperature != null ? fmt(s.attributes.temperature) + '°' : '—'),
+            cap(String(s.state).replace(/[-_]/g, ' ')));
     }
     function camUrl(s) { return s && window.HA && HA.entityPicture ? HA.entityPicture(s) : null; }
     function bust(url) { return url + (url.indexOf('?') < 0 ? '?' : '&') + '_=' + Date.now(); }

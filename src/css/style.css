@@ -1116,8 +1116,8 @@ html.preview, html.preview body {
 
 .ha-card {
     flex: none;
-    padding: 15px 22px;
-    border-radius: 18px;
+    padding: 10px 20px;
+    border-radius: 16px;
     background: rgba(255, 255, 255, 0.06);
 }
 .ha-card.ha-clock { background: none; padding: 8px 4px 4px; margin-bottom: 18px; }
@@ -1129,26 +1129,46 @@ html.preview, html.preview body {
     transform: scale(1.03);
 }
 .ha-focusable.focused .ha-name,
-.ha-focusable.focused .ha-sub { color: rgba(9, 11, 16, 0.6); }
+.ha-focusable.focused .ha-sub,
+.ha-focusable.focused .ha-kv-name,
+.ha-focusable.focused .ha-kv-sub { color: rgba(9, 11, 16, 0.55); }
+.ha-focusable.focused .ha-kv-main { color: var(--bg); }
+.ha-focusable.focused .ha-pill:not(.on) { background: rgba(9, 11, 16, 0.12); color: rgba(9, 11, 16, 0.72); }
+
+/* Key-value read-out / toggle card: name left (wraps), value right. */
+.ha-kv { display: flex; align-items: center; gap: 14px; }
+.ha-kv-name {
+    flex: 1 1 auto; min-width: 0;
+    font-size: 20px; font-weight: 600; line-height: 1.15;
+    color: var(--muted); overflow-wrap: break-word;
+}
+.ha-kv-val { flex: 0 1 auto; min-width: 0; max-width: 56%; padding-left: 10px; text-align: right; overflow-wrap: break-word; }
+.ha-kv-main { font-size: 27px; font-weight: 300; letter-spacing: -0.5px; color: var(--fg); overflow-wrap: break-word; }
+.ha-kv-main.muted { font-size: 21px; font-weight: 500; letter-spacing: 0; color: var(--muted); }
+.ha-kv-sub { margin-top: 2px; font-size: 16px; color: var(--muted); }
+
+/* Button card: the whole card is the button; label centred both axes. */
+.ha-button { display: flex; align-items: center; justify-content: center; min-height: 54px; background: rgba(255, 255, 255, 0.09); }
+.ha-btn-label { font-size: 25px; font-weight: 600; text-align: center; }
 
 .ha-name {
-    font-size: 21px;
+    font-size: 19px;
     font-weight: 600;
     color: var(--muted);
-    margin-bottom: 7px;
+    margin-bottom: 4px;
 }
-.ha-value { font-size: 36px; font-weight: 300; letter-spacing: -1px; }
+.ha-value { font-size: 29px; font-weight: 300; letter-spacing: -1px; }
 .ha-value.muted { font-size: 26px; color: var(--muted); font-weight: 500; }
-.ha-sub { margin-top: 8px; font-size: 20px; color: var(--muted); }
+.ha-sub { margin-top: 3px; font-size: 17px; color: var(--muted); }
 
 .ha-clock-time { font-size: 112px; font-weight: 300; letter-spacing: -3px; line-height: 1; }
 .ha-clock-date { margin-top: 12px; font-size: 32px; font-weight: 500; color: var(--muted); }
 
 .ha-pill {
     display: inline-block;
-    padding: 8px 26px;
-    border-radius: 24px;
-    font-size: 28px;
+    padding: 5px 22px;
+    border-radius: 22px;
+    font-size: 23px;
     font-weight: 600;
     background: rgba(255, 255, 255, 0.1);
     color: var(--muted);
@@ -1157,22 +1177,25 @@ html.preview, html.preview body {
 
 .ha-press {
     display: inline-block;
-    padding: 8px 26px;
-    border-radius: 24px;
-    font-size: 26px;
+    padding: 5px 22px;
+    border-radius: 22px;
+    font-size: 22px;
     font-weight: 600;
     background: rgba(255, 255, 255, 0.12);
 }
 
-.ha-stepper { display: flex; align-items: center; gap: 22px; }
-.ha-stepper .ha-value { min-width: 110px; text-align: center; }
+.ha-stepper { display: flex; align-items: center; gap: 16px; }
+.ha-kv .ha-stepper { flex: 0 0 auto; gap: 12px; }
+.ha-focusable.focused .ha-step { background: rgba(9, 11, 16, 0.1); }
+.ha-stepper .ha-value { min-width: 88px; text-align: center; }
+.ha-kv .ha-stepper .ha-value { min-width: 70px; }
 .ha-step {
-    width: 56px;
-    height: 56px;
-    line-height: 52px;
+    width: 44px;
+    height: 44px;
+    line-height: 41px;
     text-align: center;
     border-radius: 50%;
-    font-size: 36px;
+    font-size: 29px;
     font-weight: 400;
     background: rgba(255, 255, 255, 0.1);
 }
@@ -1206,7 +1229,7 @@ html.preview, html.preview body {
 
 /* Cards scroll below the pinned clock. */
 .ha-scroll { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; }
-.ha-track { display: flex; flex-direction: column; gap: 16px; padding: 8px 10px; box-sizing: border-box; transition: transform 0.18s ease-out; will-change: transform; }
+.ha-track { display: flex; flex-direction: column; gap: 11px; padding: 8px 10px; box-sizing: border-box; transition: transform 0.18s ease-out; will-change: transform; }
 
 /* Camera pop-over (OK on a camera tile). */
 #cam-overlay {
