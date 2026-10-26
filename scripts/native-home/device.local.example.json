@@ -1,0 +1,8 @@
+{
+  "host": "192.168.1.50",
+  "model": "QE65LS03BAUXXU",
+  "firmware": "T-PTMDEUC-1720.7",
+  "sdb": "/path/to/tizen-studio/tools/sdb",
+  "dotnet": "/usr/bin/dotnet",
+  "helper_dir": "native/build"
+}

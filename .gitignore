@@ -12,6 +12,10 @@ npm-debug.log*
 # dependencies
 node_modules/
 
+# Python bytecode from the native runner's tests
+__pycache__/
+*.pyc
+
 # signing material — never commit a Tizen author/distributor certificate
 *.p12
 *.pfx
@@ -37,6 +41,10 @@ native/**/bin/
 native/**/obj/
 native/build/
 
+# native runner: the per-TV config and the captured output of each run
+scripts/native-home/device.local.json
+scripts/native-home/out/
+
 # Easter-egg assets: personal photos and a music track. Kept out of git deliberately —
 # they ship only in local builds, and runner-game.js degrades to a notice without them.
 src/img/easter-egg/
@@ -50,6 +58,7 @@ native-snapshot.json
 
 # local agent + editor settings
 .claude/settings.local.json
+.opencode/
 .vscode/
 .idea/
 *.swp

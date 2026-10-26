@@ -8,6 +8,14 @@
     "build": "sh scripts/build.sh",
     "devlog": "node scripts/devlog-server.mjs",
     "icon": "node scripts/make-icon.mjs",
-    "fetch-assets": "node scripts/fetch-assets.mjs"
+    "fetch-assets": "node scripts/fetch-assets.mjs",
+    "native:build": "sh scripts/native-build.sh",
+    "native:bundle": "sh scripts/native-bundle.sh",
+    "native:test": "python3 scripts/native-home/test_run.py",
+    "native:inspect": "python3 scripts/native-home/run.py inspect",
+    "native:query": "python3 scripts/native-home/run.py query",
+    "native:verify": "python3 scripts/native-home/run.py verify",
+    "native:apply": "python3 scripts/native-home/run.py apply",
+    "native:restore": "python3 scripts/native-home/run.py restore"
   }
 }
