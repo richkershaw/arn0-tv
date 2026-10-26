@@ -75,6 +75,20 @@
     var clockPos = 0;
     var dark = false;
 
+    // Screen-saver photos come from an HA media folder, replacing the bundled set here only
+    // (the Home background still uses js/wallpaper.js). Bundled photos remain the offline fallback.
+    var WP_ROOT = 'media-source://media_source/local/wallpapers';
+    var haPhotos = [];              // [{id,title}] enumerated from HA media
+    var dashCfg = null;             // the idle dashboard (tv-idle) config, shown in the sidebar slot
+    var dashTimer = null;
+    // Stand-in used in desktop preview, where there is no HA backend to read tv-idle from.
+    var SS_MOCK_DASH = { views: [{ sections: [{ cards: [
+        { type: 'heading', heading: 'Overnight' },
+        { type: 'picture-entity', entity: 'camera.doorbell' },
+        { type: 'tile', entity: 'weather.pirateweather' },
+        { type: 'tile', entity: 'sensor.living_room_climate_sensor_temperature' }
+    ] }] }] };
+
     function prefs() { return Prefs.get().screensaver; }
 
     function option(list, key, fallback) {
@@ -88,26 +102,43 @@
 
     // ---------- Photos
 
+    function isHa() { return haPhotos.length > 0; }
+    function photos() { return isHa() ? haPhotos : Wallpaper.list(); }
+    function cleanTitle(t) { return (t || '').replace(/\.[a-z0-9]+$/i, ''); }
+
+    // Enumerate the HA wallpaper folder; images only. Leaves the bundled fallback in place on failure.
+    function loadHaPhotos() {
+        if (!window.HA || !HA.browseMedia || !HA.isConnected || !HA.isConnected()) return;
+        HA.browseMedia(WP_ROOT).then(function (res) {
+            var kids = (res && res.children) || [];
+            haPhotos = kids.filter(function (c) { return !c.can_expand && /^image\//.test(c.media_content_type || ''); })
+                           .map(function (c) { return { id: c.media_content_id, title: cleanTitle(c.title) }; });
+            DevLog.log('Screen saver: ' + haPhotos.length + ' HA wallpapers');
+        }, function (e) { DevLog.log('Screen saver wallpapers: ' + DevLog.errorText(e)); });
+    }
+
     function rotating() {
+        if (isHa()) return haPhotos.length > 1;
         return Prefs.get().wallpaper.mode === 'rotate' && Wallpaper.list().length > 1;
     }
 
     /*
-     * The photo follows the Background setting: Off shows no photo, Photo holds the chosen one,
-     * Rotate cycles the lot. The index is the screen saver's own — advancing it must not rewrite
-     * the Home wallpaper or restart its rotation clock, so Prefs.wallpaper is read, never written.
+     * With HA photos present they are the set and the saver rotates them. Falling back to the
+     * bundled set, the photo follows the Background setting: Off shows none, Photo holds one,
+     * Rotate cycles. Prefs.wallpaper is read, never written — advancing must not disturb Home.
      */
     function photoAt(i) {
+        var list = photos();
+        if (!list.length) return null;
+        if (isHa()) return list[((i % list.length) + list.length) % list.length];
         var p = Prefs.get().wallpaper;
         if (p.mode === 'off') return null;
-        var list = Wallpaper.list();
-        if (!list.length) return null;
         if (p.mode !== 'rotate') return Wallpaper.find(p.photo);
         return list[((i % list.length) + list.length) % list.length];
     }
 
-    // Continue from whatever is already on Home, so opening the screen saver is not a jump cut.
     function startIndex() {
+        if (isHa()) return 0;
         var key = Prefs.get().wallpaper.photo;
         var i = Wallpaper.list().findIndex(function (w) { return w.key === key; });
         return i < 0 ? 0 : i;
@@ -161,26 +192,33 @@
             nextPanAt = 0;
             return;
         }
+        if (w.id) {   // HA media: resolve to a signed URL first, then decode-before-swap
+            HA.resolveMedia(w.id).then(function (r) { paintPhoto(token, r.url); },
+                function (e) { DevLog.log('Screen saver resolve failed: ' + DevLog.errorText(e)); });
+        } else {
+            paintPhoto(token, w.file);
+        }
+    }
+    // The incoming photo is decoded on the hidden layer before anything fades, so a slow decode
+    // cannot show as a flash of empty background. A token abandons a decode that finishes late.
+    function paintPhoto(token, url) {
         var swapped = false;
         var swap = function () {
             if (swapped || token !== photoToken || !open) return;
             swapped = true;
             var back = layers[1 - front];
             var old = layers[front];
-            back.style.backgroundImage = 'url("' + w.file + '")';
-            // Placed at the corner startPan is about to drift away from, animation suppressed.
+            back.style.backgroundImage = 'url("' + url + '")';
             resetPan(back, panSign);
             front = 1 - front;
-            // Restores the transition before either property is given a new value, so the
-            // crossfade and the drift both animate instead of jumping.
             startPan();
             back.style.opacity = '1';
             old.style.opacity = '0';
         };
         var img = new Image();
         img.onload = swap;
-        img.onerror = function () { DevLog.log('Screen saver photo failed: ' + w.file); };
-        img.src = w.file;
+        img.onerror = function () { DevLog.log('Screen saver photo failed: ' + url); };
+        img.src = url;
         if (img.complete && img.naturalWidth) swap();
     }
 
@@ -202,16 +240,16 @@
     function updateClock() {
         var d = new Date();
         var t = Appearance.time(d);
-        var text = t.time + (t.suffix ? ' ' + t.suffix : '');
+        var text = t.time + (t.suffix || '');
         if (text === lastClockText) return;
         lastClockText = text;
         $('ss-time').textContent = text;
-        $('ss-date').textContent = Prefs.get().appearance.showDate ? shortDate(d) : '';
+        $('ss-date').textContent = Appearance.date(d);
     }
 
     function caption(w) {
         $('ss-title').textContent = w ? w.title : '';
-        $('ss-caption').classList.toggle('hidden', !w);
+        $('ss-caption').classList.toggle('hidden', !w || dashShown());
     }
 
     // A few pixels on each photo change, so even the text that stays put does not stay put.
@@ -219,7 +257,6 @@
         nudge = (nudge + 1) % NUDGES.length;
         var shift = 'translate(' + NUDGES[nudge][0] + 'px, ' + NUDGES[nudge][1] + 'px)';
         $('ss-caption').style.transform = shift;
-        $('ss-clock').style.transform = shift;
     }
 
     // Swaps the position class without touching the others, which now include `with-weather`.
@@ -246,6 +283,31 @@
         $('ss-wx-detail').textContent = w.detail;
     }
 
+    // ---------- Idle dashboard panel
+
+    function dashShown() { return !!(dashCfg && window.Sidebar && Sidebar.panelRender); }
+
+    function loadDashConfig() {
+        if (window.HA && HA.configured && HA.configured()) {
+            if (!HA.dashboardConfig) return;
+            HA.dashboardConfig((HA.idlePath && HA.idlePath()) || 'tv-idle').then(function (c) {
+                dashCfg = c; if (open) renderDash();
+            }, function (e) { DevLog.log('Idle dashboard: ' + DevLog.errorText(e)); });
+        } else {
+            dashCfg = SS_MOCK_DASH;   // desktop preview
+        }
+    }
+
+    function renderDash() {
+        var host = $('ss-dash'); if (!host) return;
+        if (!dashShown()) { host.classList.add('hidden'); host.innerHTML = ''; return; }
+        var track = Sidebar.panelRender(dashCfg);
+        host.innerHTML = '';
+        host.appendChild(track);
+        host.classList.remove('hidden');
+        $('ss-caption').classList.add('hidden');   // the dashboard replaces the photo credit
+    }
+
     // ---------- Open, tick, close
 
     function openSaver() {
@@ -265,8 +327,6 @@
         resetPan(layers[1], panSign);
         $('ss-dark').style.opacity = '0';
         $('ss-caption').style.transform = '';
-        setClockPos(0);
-        $('ss-clock').style.transform = '';
 
         var now = Date.now();
         openedAt = now;
@@ -276,9 +336,12 @@
 
         UI.show('screensaver');
         updateClock();
-        // Shows the cached reading at once, and asks for a new one only if the hour is up.
-        renderWeather();
-        if (window.Weather) Weather.refresh();
+        loadHaPhotos();
+        loadDashConfig();
+        renderDash();
+        if (dashTimer) clearInterval(dashTimer);
+        dashTimer = setInterval(function () { if (open && dashShown()) renderDash(); }, 12000);
+
         var w = photoAt(photoIndex);
         caption(w);
         showPhoto(w);
@@ -298,7 +361,6 @@
         if (!dark && until && now - openedAt >= until) goDark();
         // Behind an opaque black layer there is nothing worth moving.
         if (dark) return;
-        if (now >= nextClockMoveAt) moveClock();
         if (rotating() && now >= nextPhotoAt) {
             photoIndex++;
             nextPhotoAt = now + photoEvery().ms;
@@ -317,6 +379,8 @@
         open = false;
         lastInput = Date.now();
         photoToken++;
+        if (dashTimer) { clearInterval(dashTimer); dashTimer = null; }
+        var dash = $('ss-dash'); if (dash) { dash.innerHTML = ''; dash.classList.add('hidden'); }
         // Dropping the images releases two full-screen textures on a 2 GB device.
         layers.forEach(function (l) {
             l.style.opacity = '0';
@@ -350,12 +414,6 @@
 
     function init() {
         layers = [$('ss-photo-a'), $('ss-photo-b')];
-        // A reading that lands mid-session should appear without waiting for the next photo.
-        if (window.Weather) {
-            Weather.onUpdate(function () {
-                if (open) renderWeather();
-            });
-        }
         UI.register('screensaver', {
             el: $('screensaver'),
             hints: [],
@@ -363,6 +421,8 @@
             onKey: function () { close(); return true; },
             onBack: function () { close(); return true; }
         });
+        loadHaPhotos();
+        loadDashConfig();
         setInterval(function () {
             if (open) {
                 tick();

@@ -976,6 +976,20 @@ html.preview, html.preview body {
     transition: transform 1200ms ease-out;
 }
 
+/* Left column mirrors the Home sidebar exactly (width 540, padding 56/72), so the clock card
+   lands pixel-identically at 72,56. The clock stays full opacity; only the dashboard is translucent. */
+.ss-col {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 540px;
+    padding: 56px 72px 0;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+.ss-dash { opacity: 0.8; max-height: 700px; overflow: hidden; }
+.ss-dash .ha-track { gap: 11px; padding: 0 10px; }
+
 .ss-title {
     font-size: 26px;
     font-weight: 600;

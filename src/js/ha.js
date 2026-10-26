@@ -53,6 +53,7 @@
     // ---- WebSocket ----
     var ws = null, msgId = 1, connected = false, reconnectT = null;
     var handlers = {}, subId = null, cfgId = null, lovelaceSubId = null;
+    var pending = {};   // id -> {resolve,reject} for request/response WS calls
 
     function nextId() { return msgId++; }
     function sendWS(o) { try { ws.send(JSON.stringify(o)); } catch (e) {} }
@@ -92,6 +93,11 @@
             else if (!m.success) log('HA dashboard "' + (cfg.sidebar || '') + '" not readable');
             return;
         }
+        if (m.type === 'result' && pending[m.id]) {
+            var pr = pending[m.id]; delete pending[m.id];
+            if (m.success) pr.resolve(m.result); else pr.reject(new Error((m.error && m.error.message) || 'HA WS error'));
+            return;
+        }
         if (m.type === 'event' && m.id === lovelaceSubId && m.event) {
             var d = m.event.data || {};
             if ((d.url_path || null) === (cfg.sidebar || null)) { log('HA dashboard changed; reloading config'); refetchConfig(); }
@@ -126,12 +132,34 @@
         return request('GET', '/api/').then(function (t) { log('HA REST: ' + t); return t; });
     }
 
+    // Generic request/response over the WebSocket.
+    function wsRequest(obj) {
+        if (!connected || !ws) return Promise.reject(new Error('HA not connected'));
+        return new Promise(function (resolve, reject) {
+            obj.id = nextId();
+            pending[obj.id] = { resolve: resolve, reject: reject };
+            try { ws.send(JSON.stringify(obj)); } catch (e) { delete pending[obj.id]; reject(e); }
+        });
+    }
+    // Media source: browse a folder, resolve one item to a fetchable (signed) URL.
+    function browseMedia(id) { return wsRequest({ type: 'media_source/browse_media', media_content_id: id }); }
+    function dashboardConfig(urlPath) { return wsRequest({ type: 'lovelace/config', url_path: urlPath || null }); }
+    function resolveMedia(id) {
+        return wsRequest({ type: 'media_source/resolve_media', media_content_id: id }).then(function (r) {
+            return { url: base() + r.url, mime_type: r.mime_type };
+        });
+    }
+
     window.HA = {
         configured: configured,
         base: base,
         request: request,
         callService: callService,
         entityPicture: entityPicture,
+        browseMedia: browseMedia,
+        resolveMedia: resolveMedia,
+        dashboardConfig: dashboardConfig,
+        idlePath: function () { return cfg.idle || null; },
         connect: connect,
         isConnected: function () { return connected; },
         test: test,

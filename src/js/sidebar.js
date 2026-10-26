@@ -60,6 +60,7 @@
     var haveConfig = false, haveStates = false;
     var cardEls = {};      // entity -> [box]
     var camImgs = [];      // in-column camera <img>
+    var panelMode = false; // true while building a read-only panel (e.g. the screen saver)
     var camOverlay = null; // { img, base } when the pop-over is open
     var lastSig = '';
 
@@ -281,7 +282,7 @@
         var frame = el('div', 'ha-cam'), url = camUrl(s);
         if (url) {
             var img = new Image(); img.className = 'ha-cam-img'; img._base = url; img.src = bust(url);
-            frame.appendChild(img); camImgs.push(img);
+            frame.appendChild(img); if (!panelMode) camImgs.push(img);
         } else if (s) { frame.classList.add('ha-cam-live'); }
         else { frame.appendChild(el('div', 'ha-cam-off', 'camera unavailable')); }
         b.appendChild(frame);
@@ -530,6 +531,19 @@
         openCamera: openCamera,
         closeCamera: closeCamera,
         isStepper: function (box) { return box && box._card && (box._card.kind === 'number' || box._card.kind === 'climate'); },
+        // Build a read-only .ha-track from any dashboard config, using the live states.
+        panelRender: function (config) {
+            var track = el('div', 'ha-track');
+            panelMode = true;
+            try {
+                normalise(config).forEach(function (card) {
+                    if (card.kind !== 'heading' && !card.entity) return;
+                    if (!visible(card)) return;
+                    track.appendChild(buildCard(card));
+                });
+            } finally { panelMode = false; }
+            return track;
+        },
         isMedia: function (box) { return box && box._card && box._card.kind === 'media'; },
         mediaControl: mediaControl,
         isCamera: function (box) { return box && box._card && box._card.kind === 'camera'; }

@@ -91,7 +91,8 @@ window.LAUNCHER_CONFIG = {
     homeAssistant: {
         url: null,          // 'http://<ha-host>:8123'
         token: null,        // a long-lived access token (HA profile -> Security)
-        sidebar: null       // the Lovelace dashboard url_path the left column reads, e.g. 'tv-sidebar'
+        sidebar: null,      // the Lovelace dashboard url_path the left column reads, e.g. 'tv-sidebar'
+        idle: null          // the dashboard the screen saver shows, e.g. 'tv-idle' (falls back to 'tv-idle')
     },
 
     /*
