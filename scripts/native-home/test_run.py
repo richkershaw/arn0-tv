@@ -71,24 +71,37 @@ def valid_baseline(**overrides):
     return data
 
 
-class BaselineGate(unittest.TestCase):
+class BaselineShape(unittest.TestCase):
     def test_a_good_baseline_passes(self):
-        self.assertEqual(run.baseline_problems(valid_baseline()), [])
+        self.assertEqual(run.baseline_shape_problems(valid_baseline()), [])
 
-    def test_autostart_zero_is_refused(self):
-        problems = run.baseline_problems(valid_baseline(Autostart=0))
-        self.assertTrue(any("Autostart is 0" in p for p in problems))
+    def test_autostart_zero_is_still_well_shaped(self):
+        # The shape check must not carry the apply policy: restore and verify use
+        # an auto_start=0 baseline too.
+        self.assertEqual(run.baseline_shape_problems(valid_baseline(Autostart=0)), [])
 
     def test_missing_key_is_refused(self):
         bad = valid_baseline()
         del bad["Strings"]["db/appfw/home_appid"]
-        self.assertTrue(run.baseline_problems(bad))
+        self.assertTrue(run.baseline_shape_problems(bad))
 
     def test_bad_autostart_type_is_refused(self):
-        self.assertTrue(run.baseline_problems(valid_baseline(Autostart=True)))
+        self.assertTrue(run.baseline_shape_problems(valid_baseline(Autostart=True)))
 
     def test_non_object_is_refused(self):
-        self.assertTrue(run.baseline_problems([]))
+        self.assertTrue(run.baseline_shape_problems([]))
+
+
+class ApplyGate(unittest.TestCase):
+    def test_autostart_zero_blocks_apply(self):
+        problems = run.apply_gate_problems(valid_baseline(Autostart=0))
+        self.assertTrue(any("Autostart is 0" in p for p in problems))
+
+    def test_autostart_one_allows_apply(self):
+        self.assertEqual(run.apply_gate_problems(valid_baseline(Autostart=1)), [])
+
+    def test_gate_is_silent_on_a_non_object(self):
+        self.assertEqual(run.apply_gate_problems([]), [])
 
 
 class Config(unittest.TestCase):

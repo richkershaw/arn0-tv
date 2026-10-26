@@ -91,7 +91,8 @@ recovery bundle (`npm run native:bundle`) deliberately does not include it.
 - Read-only is the default; every write is its own command.
 - The runner refuses `apply`/`restore` without a baseline, and refuses to even
   stage anything if it is not shaped the way `Control.cs` expects.
-- **`apply` refuses when the baseline's `Autostart` is `0`** — see below.
+- **`apply` refuses when the baseline's `Autostart` is `0`** — see below. This
+  blocks `apply` only; `verify` and `restore` still work on such a baseline.
 - `apply` asks you to type `APPLY` (or set `ARN0_CONFIRM_APPLY=1` to confirm
   non-interactively). No typing, no write.
 - The helpers themselves re-check 32-bit, uid=901 and the firmware string, read

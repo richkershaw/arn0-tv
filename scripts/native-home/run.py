@@ -124,10 +124,11 @@ def check_output(mode: str, text: str) -> tuple[bool, str]:
     return True, ""
 
 
-def baseline_problems(data: object) -> list[str]:
-    """Validate a saved baseline the way Control.cs does, plus the Frame gate.
+def baseline_shape_problems(data: object) -> list[str]:
+    """Structural checks, the same ones Control.cs makes when it loads a snapshot.
 
-    Returns a list of problems (empty means the baseline is safe to use).
+    This governs every baseline mode (`verify`, `apply`, `restore`): a baseline
+    that is not shaped the way Control.cs expects must never be staged.
     """
     problems: list[str] = []
     if not isinstance(data, dict):
@@ -146,12 +147,25 @@ def baseline_problems(data: object) -> list[str]:
                 problems.append("Strings is missing " + key)
     if isinstance(autostart, bool) or not isinstance(autostart, int) or autostart not in (0, 1):
         problems.append("Autostart must be 0 or 1")
-    elif autostart == 0:
-        problems.append(
-            "Autostart is 0. The reference TV had 1 and arn0's guide says to stop "
-            "and research this configuration before applying. Not proceeding."
-        )
     return problems
+
+
+def apply_gate_problems(data: object) -> list[str]:
+    """The one policy gate, and only for `apply`.
+
+    The reference TV had `auto_start = 1`; arn0's guide says to stop and research
+    the `0` case before applying. `verify` and `restore` are deliberately *not*
+    gated by this — restore is the way back and must always be available.
+    """
+    autostart = data.get("Autostart") if isinstance(data, dict) else None
+    if autostart == 0:
+        return [
+            "Autostart is 0. The reference TV had 1 and arn0's guide says to stop and "
+            "research this configuration before applying, and the S90D work this method "
+            "comes from saw no foreground boot with auto_start 0. `apply` is refused; "
+            "`verify` and `restore` still work."
+        ]
+    return []
 
 
 def build_config(env: dict, file_values: dict | None) -> dict:
@@ -384,14 +398,20 @@ def main(argv: list[str]) -> int:
         except json.JSONDecodeError as exc:
             print("baseline: not valid JSON (" + str(exc) + ")", file=sys.stderr)
             return 2
-        baseline_issues = baseline_problems(baseline)
-        if baseline_issues:
-            for issue in baseline_issues:
+        shape_issues = baseline_shape_problems(baseline)
+        if shape_issues:
+            for issue in shape_issues:
                 print("baseline: " + issue, file=sys.stderr)
             return 2
-        if mode == "apply" and not confirm_apply():
-            print("apply: not confirmed; nothing was staged.", file=sys.stderr)
-            return 2
+        if mode == "apply":
+            gate_issues = apply_gate_problems(baseline)
+            if gate_issues:
+                for issue in gate_issues:
+                    print("baseline: " + issue, file=sys.stderr)
+                return 2
+            if not confirm_apply():
+                print("apply: not confirmed; nothing was staged.", file=sys.stderr)
+                return 2
 
     try:
         print("preflight: " + preflight(cfg))

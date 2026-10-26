@@ -168,7 +168,9 @@ it as an experiment, not a supported flow.
   is what the boot manager uses to choose the Home app. A Frame often wakes into Art Mode, so this
   is the behaviour to watch.
 - **The `auto_start = 0` gate.** If your baseline's `Autostart` is `0`, stop and research that case
-  before applying. The runner enforces this and will not stage the write-capable helper.
+  before applying. The runner enforces this by refusing `apply`; `verify` and `restore` still work,
+  because restore is the way back. The S90D work this method comes from saw no foreground boot with
+  `auto_start` at `0`, so cold-boot behaviour on such a TV is genuinely unknown.
 
 Before keeping any apply, confirm on the TV: the launcher's **Settings → Samsung Home** entry
 opens something usable, the **Power-key art toggle** still works, a **cold start** lands where you
